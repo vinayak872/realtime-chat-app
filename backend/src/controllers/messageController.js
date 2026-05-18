@@ -1,4 +1,5 @@
 import { Message } from '../models/index.js';
+import { Op, fn, col } from 'sequelize';
 
 export const sendMessage = async (req, res, next) => {
   try {
@@ -64,7 +65,7 @@ export const markChatMessagesAsRead = async (req, res, next) => {
       {
         where: {
           chatId,
-          senderId: { [require('sequelize').Op.ne]: userId },
+          senderId: { [Op.ne]: userId },
           isRead: false,
         },
       }

@@ -1,14 +1,17 @@
 import React, { useContext, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChatContext } from '../context/ChatContext';
 import { AuthContext } from '../context/AuthContext';
 import { chatService, authService } from '../services/api';
 
 const ChatList = () => {
   const { chats, setChats, currentChat, setCurrentChat } = useContext(ChatContext);
-  const { user } = useContext(AuthContext);
+  const { user, logout } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [showUserList, setShowUserList] = useState(false);
   const [allUsers, setAllUsers] = useState([]);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   useEffect(() => {
     const fetchAllUsers = async () => {
@@ -45,12 +48,55 @@ const ChatList = () => {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
+
   const filteredChats = chats.filter((chat) =>
     chat.otherUser.username.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
     <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+      {/* User Profile Section */}
+      <div className="p-4 border-b border-gray-200 bg-light">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 flex-1">
+            <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-semibold">
+              {user?.username.charAt(0).toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm truncate">{user?.username}</p>
+              <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowProfileMenu(!showProfileMenu)}
+            className="text-gray-600 hover:text-primary rounded-full p-1 transition"
+            title="Profile menu"
+          >
+            ⋮
+          </button>
+        </div>
+
+        {/* Profile Menu Dropdown */}
+        {showProfileMenu && (
+          <div className="mt-2 bg-white border border-gray-200 rounded-lg shadow-md z-10">
+            <button
+              onClick={handleLogout}
+              className="w-full text-left px-4 py-2 hover:bg-light text-red-600 font-semibold rounded transition text-sm"
+            >
+              Logout
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex justify-between items-center mb-4">
@@ -68,7 +114,7 @@ const ChatList = () => {
           placeholder="Search chats..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full px-3 py-2 bg-light rounded-full focus:outline-none text-sm"
+          className="w-full px-3 py-2 bg-white border border-gray-300 rounded-full focus:outline-none focus:border-primary text-sm"
         />
       </div>
 

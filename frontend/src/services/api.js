@@ -17,6 +17,7 @@ api.interceptors.request.use((config) => {
 export const authService = {
   register: (data) => api.post('/auth/register', data),
   login: (data) => api.post('/auth/login', data),
+  logout: () => api.post('/auth/logout'),
   getProfile: () => api.get('/auth/profile'),
   getAllUsers: () => api.get('/auth/users'),
   updateProfile: (data) => api.put('/auth/profile', data),

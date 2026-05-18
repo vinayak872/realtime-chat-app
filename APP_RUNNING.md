@@ -1,26 +1,30 @@
-# 🎉 Chat Application is Running!
+# 🚀 Real-Time Chat Application - Running
 
 ## ✅ Application Status
 
-### Backend Server
+### 🟢 Backend Server
 ```
-📦 Using SQLite database at: /Users/vinayakkumar/real-time-chat-application/backend/data/chat_app.db
-✅ Database connected successfully
-✅ Database models synchronized
-✅ Server is running on port 5000
-✅ Ready to accept connections
-```
-
-**URL:** http://localhost:5000
-
-### Frontend Server
-```
-✅ Vite v5.4.21 ready
-✅ Development server running on port 5173
-✅ Ready for browser connection
+Status: ✅ RUNNING
+URL: http://localhost:5000
+PID: 18328
+Database: SQLite (backend/data/chat_app.db)
+Socket.IO: Ready for real-time events
 ```
 
-**URL:** http://localhost:5173
+**Backend Health Check:**
+```bash
+curl http://localhost:5000/api/auth/users
+# Response: {"message":"No token provided"}
+# ✅ Server is responding
+```
+
+### 🟢 Frontend Server
+```
+Status: ✅ RUNNING
+URL: http://localhost:5173
+PID: 33623
+Build Tool: Vite v5.4.21
+```
 
 ---
 

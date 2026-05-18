@@ -1,5 +1,6 @@
 import { User } from '../models/index.js';
 import { generateToken } from '../utils/jwt.js';
+import { Op } from 'sequelize';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -120,13 +121,23 @@ export const getAllUsers = async (req, res, next) => {
   try {
     const users = await User.findAll({
       where: {
-        id: { [require('sequelize').Op.ne]: req.user.userId },
+        id: { [Op.ne]: req.user.userId },
       },
       attributes: { exclude: ['password'] },
     });
 
     res.status(200).json({
       users,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const logout = async (req, res, next) => {
+  try {
+    res.status(200).json({
+      message: 'Logout successful',
     });
   } catch (error) {
     next(error);

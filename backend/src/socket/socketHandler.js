@@ -60,7 +60,7 @@ export const initializeSocket = (io) => {
         const chat = await Chat.findByPk(chatId);
         const receiverId = chat.user1Id === userId ? chat.user2Id : chat.user1Id;
 
-        io.to(`user:${receiverId}`).emit('message:new', {
+        const messageData = {
           id: message.id,
           chatId,
           senderId: userId,
@@ -70,7 +70,11 @@ export const initializeSocket = (io) => {
           fileName: message.fileName,
           createdAt: message.createdAt,
           isRead: false,
-        });
+        };
+
+        // Emit to both sender and receiver
+        io.to(`user:${userId}`).emit('message:new', messageData);
+        io.to(`user:${receiverId}`).emit('message:new', messageData);
 
         socket.emit('message:sent', {
           id: message.id,

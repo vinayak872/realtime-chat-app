@@ -1,5 +1,5 @@
 import { Chat, Message, User } from '../models/index.js';
-import { Op } from 'sequelize';
+import { Op, fn, col } from 'sequelize';
 
 export const createChat = async (req, res, next) => {
   try {
@@ -117,7 +117,7 @@ export const getUnreadCount = async (req, res, next) => {
     const userId = req.user.userId;
 
     const unreadCounts = await Message.findAll({
-      attributes: ['chatId', [require('sequelize').fn('COUNT', require('sequelize').col('id')), 'unreadCount']],
+      attributes: ['chatId', [fn('COUNT', col('id')), 'unreadCount']],
       where: {
         [Op.and]: [{ isRead: false }],
       },
