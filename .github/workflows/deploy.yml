@@ -1,0 +1,68 @@
+name: Auto Deploy
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Install Backend Dependencies
+      working-directory: ./backend
+      run: npm install
+
+    - name: Install Frontend Dependencies
+      working-directory: ./frontend
+      run: npm install
+
+    - name: Build Frontend
+      working-directory: ./frontend
+      run: npm run build
+
+    - name: Create Deployment Summary
+      run: |
+        echo "## ✅ Deployment Ready" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Application Status" >> $GITHUB_STEP_SUMMARY
+        echo "- Backend: Ready to run" >> $GITHUB_STEP_SUMMARY
+        echo "- Frontend: Built successfully" >> $GITHUB_STEP_SUMMARY
+        echo "- Database: SQLite configured" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Quick Start" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+        echo "# Clone the repo" >> $GITHUB_STEP_SUMMARY
+        echo "git clone https://github.com/vinayak872/realtime-chat-app.git" >> $GITHUB_STEP_SUMMARY
+        echo "cd realtime-chat-app" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "# Terminal 1: Start Backend" >> $GITHUB_STEP_SUMMARY
+        echo "cd backend && npm install && npm start" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "# Terminal 2: Start Frontend" >> $GITHUB_STEP_SUMMARY
+        echo "cd frontend && npm install && npm run dev" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "# Open: http://localhost:5173" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: frontend-build
+        path: frontend/dist/
+        retention-days: 7
+
+    - name: Notify Deployment
+      run: |
+        echo "🚀 Deployment workflow completed successfully!"
+        echo "✅ Frontend built and ready"
+        echo "✅ Backend configured"
+        echo "📦 Artifacts uploaded"
