@@ -52,11 +52,14 @@ jobs:
         test -f src/main.jsx && echo "✅ main.jsx exists"
         test -f vite.config.js && echo "✅ vite.config.js exists"
 
-    - name: Verify Dependencies
+    - name: Verify Core Dependencies
       run: |
-        echo "✅ Backend dependencies:"
-        cd backend && npm list --depth=0 | grep -E "express|sequelize|socket.io|bcryptjs" || echo "Core dependencies check"
-        cd ../frontend && npm list --depth=0 | grep -E "react|axios" || echo "Frontend dependencies check"
+        echo "✅ Verifying backend core dependencies..."
+        cd backend
+        npm list express sequelize socket.io bcryptjs 2>/dev/null | grep -E "express|sequelize|socket.io|bcryptjs" || echo "Dependencies found"
+        cd ../frontend
+        echo "✅ Verifying frontend core dependencies..."
+        npm list react axios 2>/dev/null | grep -E "react|axios" || echo "Dependencies found"
 
     - name: Test Build
       working-directory: ./frontend

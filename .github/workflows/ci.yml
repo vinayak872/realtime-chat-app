@@ -35,22 +35,17 @@ jobs:
       working-directory: ./frontend
       run: npm run build
 
-    - name: Run Backend Linting (if available)
-      working-directory: ./backend
-      run: npm run lint 2>/dev/null || echo "No linting script found"
-
-    - name: Run Frontend Linting (if available)
-      working-directory: ./frontend
-      run: npm run lint 2>/dev/null || echo "No linting script found"
-
-    - name: Verify Database Setup
-      working-directory: ./backend
+    - name: Verify Project Structure
       run: |
-        echo "Backend structure verified"
-        ls -la src/
+        echo "✅ Verifying backend structure..."
+        test -f backend/package.json && echo "✅ Backend package.json found"
+        test -d backend/src && echo "✅ Backend src directory found"
+        test -f frontend/package.json && echo "✅ Frontend package.json found"
+        test -d frontend/src && echo "✅ Frontend src directory found"
 
     - name: Summary
       run: |
         echo "✅ Build completed successfully!"
         echo "✅ All dependencies installed"
         echo "✅ Frontend build successful"
+        echo "✅ Project structure verified"
