@@ -4,7 +4,8 @@ import path from 'path';
 
 dotenv.config();
 
-// Use SQLite for development, MySQL for production
+
+// Use SQLite for development, PostgreSQL for production
 const isDevelopment = process.env.NODE_ENV === 'development';
 
 let sequelize;
@@ -19,15 +20,15 @@ if (isDevelopment || process.env.DB_DIALECT === 'sqlite') {
   });
   console.log(`📦 Using SQLite database at: ${dbPath}`);
 } else {
-  // Production: Use MySQL
+  // Production: Use PostgreSQL
   sequelize = new Sequelize(
-    process.env.DB_NAME || 'chat_app',
-    process.env.DB_USER || 'root',
-    process.env.DB_PASSWORD || '',
+    process.env.DB_NAME,
+    process.env.DB_USER,
+    process.env.DB_PASSWORD,
     {
-      host: process.env.DB_HOST || 'localhost',
-      port: process.env.DB_PORT || 3306,
-      dialect: 'mysql',
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT || 5432,
+      dialect: 'postgres',
       logging: process.env.NODE_ENV === 'development' ? console.log : false,
       pool: {
         max: 10,
@@ -37,7 +38,7 @@ if (isDevelopment || process.env.DB_DIALECT === 'sqlite') {
       },
     }
   );
-  console.log(`📦 Using MySQL database`);
+  console.log(`📦 Using PostgreSQL database`);
 }
 
 export default sequelize;
