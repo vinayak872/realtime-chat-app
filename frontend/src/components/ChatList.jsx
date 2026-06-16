@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { ChatContext } from '../context/ChatContext';
 import { AuthContext } from '../context/AuthContext';
 import { chatService, authService } from '../services/api';
+import { getSocket, socketEvents } from '../services/socket';
 
 const ChatList = () => {
-  const { chats, setChats, currentChat, setCurrentChat } = useContext(ChatContext);
+  const { chats, setChats, currentChat, setCurrentChat, unreadCounts, setUnreadCounts } = useContext(ChatContext);
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [showUserList, setShowUserList] = useState(false);
+  const [showUserList, setShowUserList] = useState(true);
   const [allUsers, setAllUsers] = useState([]);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
@@ -27,6 +28,38 @@ const ChatList = () => {
       fetchAllUsers();
     }
   }, [showUserList]);
+
+  // Listen for new messages to update the chat list sorting and unread counts
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleNewMessage = (message) => {
+      setChats((prevChats) => {
+        const chatIndex = prevChats.findIndex((c) => c.id === message.chatId);
+        if (chatIndex > -1) {
+          const updatedChat = { ...prevChats[chatIndex], lastMessage: message };
+          const newChats = [...prevChats];
+          newChats.splice(chatIndex, 1);
+          return [updatedChat, ...newChats]; // Move chat to the top
+        }
+        return prevChats;
+      });
+
+      // Increment unread count if the chat is not currently open
+      if (currentChat?.id !== message.chatId) {
+        setUnreadCounts((prev) => ({
+          ...prev,
+          [message.chatId]: (prev[message.chatId] || 0) + 1,
+        }));
+      }
+    };
+
+    socket.on(socketEvents.messageNew, handleNewMessage);
+    return () => {
+      socket.off(socketEvents.messageNew, handleNewMessage);
+    };
+  }, [currentChat?.id, setChats, setUnreadCounts]);
 
   const handleStartChat = async (user2Id) => {
     try {
@@ -57,12 +90,19 @@ const ChatList = () => {
     }
   };
 
-  const filteredChats = chats.filter((chat) =>
+  // Sort chats by latest message timestamp, then filter by search term
+  const sortedChats = [...chats].sort((a, b) => {
+    const dateA = a.lastMessage?.createdAt ? new Date(a.lastMessage.createdAt) : new Date(a.createdAt);
+    const dateB = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt) : new Date(b.createdAt);
+    return dateB - dateA;
+  });
+
+  const filteredChats = sortedChats.filter((chat) =>
     chat.otherUser.username.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+    <div className={`bg-white border-r border-gray-200 flex-col h-full shrink-0 ${currentChat ? 'hidden md:flex md:w-80' : 'flex w-full md:w-80'}`}>
       {/* User Profile Section */}
       <div className="p-4 border-b border-gray-200 bg-light">
         <div className="flex items-center justify-between">
@@ -149,32 +189,49 @@ const ChatList = () => {
       {/* Chat List */}
       <div className="flex-1 overflow-y-auto">
         {filteredChats.length > 0 ? (
-          filteredChats.map((chat) => (
+          filteredChats.map((chat) => {
+            const unreadCount = unreadCounts[chat.id] || 0;
+            const isUnread = unreadCount > 0;
+            const isSelected = currentChat?.id === chat.id;
+
+            return (
             <button
               key={chat.id}
-              onClick={() => setCurrentChat(chat)}
-              className={`w-full p-3 border-b border-gray-100 hover:bg-light transition text-left ${
-                currentChat?.id === chat.id ? 'bg-light' : ''
+              onClick={() => {
+                setCurrentChat(chat);
+                setUnreadCounts((prev) => ({ ...prev, [chat.id]: 0 }));
+              }}
+              className={`w-full p-3 border-b border-gray-100 transition text-left flex items-center ${
+                isSelected ? 'bg-light' : isUnread ? 'bg-green-50' : 'hover:bg-light'
               }`}
             >
-              <div className="flex gap-3">
+              <div className="flex gap-3 w-full">
                 <div className="w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center font-semibold flex-shrink-0">
                   {chat.otherUser.username.charAt(0).toUpperCase()}
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 flex flex-col justify-center">
                   <div className="flex justify-between items-center">
-                    <p className="font-semibold text-sm">{chat.otherUser.username}</p>
-                    <span className="text-xs text-gray-400">
+                    <p className={`text-sm truncate ${isUnread ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>
+                      {chat.otherUser.username}
+                    </p>
+                    <span className={`text-xs flex-shrink-0 ml-2 ${isUnread ? 'text-green-600 font-semibold' : 'text-gray-400'}`}>
                       {chat.lastMessage && new Date(chat.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-500 truncate">
-                    {chat.lastMessage?.content || 'No messages yet'}
-                  </p>
+                  <div className="flex justify-between items-center mt-1">
+                    <p className={`text-sm truncate ${isUnread ? 'font-semibold text-gray-800' : 'text-gray-500'}`}>
+                      {chat.lastMessage?.content || (chat.lastMessage?.fileUrl ? '📎 File attached' : 'No messages yet')}
+                    </p>
+                    {isUnread && (
+                      <span className="bg-green-500 text-white text-xs font-bold px-2 py-0.5 rounded-full ml-2 flex-shrink-0">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </button>
-          ))
+          )})
         ) : (
           <div className="flex items-center justify-center h-full">
             <p className="text-gray-400">No chats yet</p>

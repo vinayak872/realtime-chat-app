@@ -1,6 +1,14 @@
 import React, { useContext, forwardRef } from 'react';
 import { ChatContext } from '../context/ChatContext';
 import { AuthContext } from '../context/AuthContext';
+import VoiceMessage from './VoiceMessage';
+
+const getFullUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('http')) return url;
+  const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+  return `${baseUrl}${url}`;
+};
 
 const MessageList = forwardRef(({ loading }, ref) => {
   const { messages } = useContext(ChatContext);
@@ -28,15 +36,17 @@ const MessageList = forwardRef(({ loading }, ref) => {
             className={`flex ${message.senderId === user.id ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+              className={`max-w-[85%] sm:max-w-md px-3 md:px-4 py-2 rounded-lg ${
                 message.senderId === user.id
                   ? 'bg-primary text-white'
                   : 'bg-gray-200 text-gray-800'
               }`}
             >
-              {message.fileUrl ? (
+            {message.fileType === 'audio' ? (
+              <VoiceMessage fileUrl={message.fileUrl} />
+            ) : message.fileUrl ? (
                 <a
-                  href={message.fileUrl}
+                  href={getFullUrl(message.fileUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-blue-400 hover:underline block"

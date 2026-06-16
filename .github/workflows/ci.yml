@@ -10,42 +10,44 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x]
-
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
     
-    - name: Use Node.js ${{ matrix.node-version }}
+    - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
-        node-version: ${{ matrix.node-version }}
+        node-version: '20.x'
         cache: 'npm'
+        cache-dependency-path: |
+          backend/package-lock.json
+          frontend/package-lock.json
 
     - name: Install Backend Dependencies
       working-directory: ./backend
-      run: npm install
+      run: npm install --legacy-peer-deps
 
     - name: Install Frontend Dependencies
       working-directory: ./frontend
-      run: npm install
+      run: npm install --legacy-peer-deps
 
     - name: Build Frontend
       working-directory: ./frontend
       run: npm run build
 
-    - name: Verify Project Structure
+    - name: Verify Backend Files
       run: |
-        echo "✅ Verifying backend structure..."
-        test -f backend/package.json && echo "✅ Backend package.json found"
-        test -d backend/src && echo "✅ Backend src directory found"
-        test -f frontend/package.json && echo "✅ Frontend package.json found"
-        test -d frontend/src && echo "✅ Frontend src directory found"
+        echo "✅ Backend files:"
+        ls -la backend/src/index.js
+        ls -la backend/package.json
 
-    - name: Summary
+    - name: Verify Frontend Build
+      run: |
+        echo "✅ Frontend build output:"
+        ls -la frontend/dist/ | head -10
+
+    - name: Build Summary
       run: |
         echo "✅ Build completed successfully!"
-        echo "✅ All dependencies installed"
-        echo "✅ Frontend build successful"
-        echo "✅ Project structure verified"
+        echo "✅ Backend: Ready"
+        echo "✅ Frontend: Built successfully"

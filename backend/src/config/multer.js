@@ -22,6 +22,9 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
+  // Strip out codec info (e.g., 'audio/webm;codecs=opus' -> 'audio/webm')
+  const baseMimeType = file.mimetype.split(';')[0];
+
   const allowedMimes = [
     'image/jpeg',
     'image/png',
@@ -32,9 +35,17 @@ const fileFilter = (req, file, cb) => {
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/vnd.ms-excel',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'audio/webm',
+    'audio/ogg',
+    'audio/mp4',
+    'audio/mpeg',
+    'audio/wav',
+    'video/mp4',
+    'video/webm'
   ];
 
-  if (allowedMimes.includes(file.mimetype)) {
+  // Allow explicit types, plus safely fallback to allow any audio file
+  if (allowedMimes.includes(baseMimeType) || baseMimeType.startsWith('audio/')) {
     cb(null, true);
   } else {
     cb(new Error('Unsupported file type'), false);
