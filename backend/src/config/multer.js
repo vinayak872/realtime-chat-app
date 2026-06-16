@@ -23,7 +23,8 @@ const storage = multer.diskStorage({
 
 const fileFilter = (req, file, cb) => {
   // Strip out codec info (e.g., 'audio/webm;codecs=opus' -> 'audio/webm')
-  const baseMimeType = file.mimetype.split(';')[0];
+  const baseMimeType = file.mimetype ? file.mimetype.split(';')[0] : 'application/octet-stream';
+  const ext = path.extname(file.originalname).toLowerCase();
 
   const allowedMimes = [
     'image/jpeg',
@@ -41,11 +42,14 @@ const fileFilter = (req, file, cb) => {
     'audio/mpeg',
     'audio/wav',
     'video/mp4',
-    'video/webm'
+    'video/webm',
+    'application/octet-stream'
   ];
 
+  const allowedAudioExts = ['.webm', '.mp4', '.ogg', '.wav', '.mp3', '.m4a'];
+
   // Allow explicit types, plus safely fallback to allow any audio file
-  if (allowedMimes.includes(baseMimeType) || baseMimeType.startsWith('audio/')) {
+  if (allowedMimes.includes(baseMimeType) || baseMimeType.startsWith('audio/') || allowedAudioExts.includes(ext)) {
     cb(null, true);
   } else {
     cb(new Error('Unsupported file type'), false);

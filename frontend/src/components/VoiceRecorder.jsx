@@ -55,7 +55,7 @@ const VoiceRecorder = ({ chatId, onSent }) => {
 
     // Get actual mime type from recorded chunks (crucial for Safari/mobile support)
     const actualMimeType = chunksRef.current[0]?.type || getMimeType() || "audio/webm";
-    const baseMimeType = actualMimeType.split(";")[0];
+    const baseMimeType = actualMimeType.split(";")[0] || "audio/webm";
     let ext = actualMimeType.split("/")[1]?.split(";")[0] || "webm";
     
     // Normalize extensions
