@@ -91,7 +91,7 @@ const CallModal = () => {
   return (
     <div
       ref={containerRef}
-      className="fixed inset-0 z-50 flex flex-col bg-slate-950 text-white select-none overflow-hidden"
+      className="fixed inset-0 z-[9990] flex flex-col bg-slate-950 text-white select-none overflow-hidden"
     >
       {/* Hidden audio element for remote audio stream playback */}
       <audio

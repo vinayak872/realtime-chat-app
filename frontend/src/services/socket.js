@@ -2,36 +2,59 @@ import io from 'socket.io-client';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 
-let socket;
+let socket = null;
+let savedToken = null;
 
 export const initializeSocket = (token) => {
-  if (socket && socket.connected) {
+  if (token) {
+    savedToken = token;
+  }
+
+  // Singleton: if socket instance already exists, do NOT recreate or disconnect!
+  if (socket) {
+    if (socket.connected && savedToken) {
+      socket.emit('user:online', { token: savedToken });
+    }
     return socket;
   }
-  if (socket) {
-    socket.disconnect();
-  }
+
+  console.log('[Socket] Initializing connection to:', SOCKET_URL);
 
   socket = io(SOCKET_URL, {
     reconnection: true,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
-    reconnectionAttempts: 5,
+    reconnectionAttempts: 10,
+    transports: ['websocket', 'polling'],
   });
 
   socket.on('connect', () => {
-    console.log('Connected to socket server');
-    socket.emit('user:online', { token });
+    console.log('[Socket] Connected successfully, id:', socket.id);
+    if (savedToken) {
+      socket.emit('user:online', { token: savedToken });
+    }
   });
 
-  socket.on('disconnect', () => {
-    console.log('Disconnected from socket server');
+  socket.on('disconnect', (reason) => {
+    console.log('[Socket] Disconnected:', reason);
+  });
+
+  socket.on('connect_error', (error) => {
+    console.warn('[Socket] Connection error:', error.message);
   });
 
   return socket;
 };
 
 export const getSocket = () => socket;
+
+export const disconnectSocket = () => {
+  if (socket) {
+    socket.disconnect();
+    socket = null;
+  }
+  savedToken = null;
+};
 
 export const socketEvents = {
   userOnline: 'user:online',

@@ -195,13 +195,12 @@ export const CallProvider = ({ children }) => {
       }
 
       localStreamRef.current = stream;
-      setLocalStream(stream);
-
       playOutgoingDialTone();
 
-      // Emit initiate event
+      // Emit initiate event with normalized target ID
+      const targetUserId = Number(targetUser.id || targetUser.userId || targetUser._id);
       socket.emit(socketEvents.callInitiate, {
-        toUserId: targetUser.id,
+        toUserId: targetUserId,
         callType: requestedType,
         chatId,
       });
@@ -233,7 +232,7 @@ export const CallProvider = ({ children }) => {
       setLocalStream(stream);
 
       // Create peer connection
-      createPeerConnection(caller.id, activeCallId);
+      createPeerConnection(Number(caller.id), activeCallId);
 
       socket.emit(socketEvents.callAccept, {
         callId: activeCallId,
@@ -427,14 +426,19 @@ export const CallProvider = ({ children }) => {
 
     // Incoming call received
     const handleCallIncoming = (data) => {
+      console.log('[CallContext] Incoming call received from socket:', data);
       setActiveCallId(data.callId);
-      setCaller(data.caller);
+      setCaller(data.caller || { id: data.fromUserId, username: 'Caller' });
       setCallee(user);
-      setCallType(data.callType);
+      setCallType(data.callType || 'audio');
       setTargetChatId(data.chatId);
       setCallStatus('incoming');
-      setIsVideoOff(data.callType === 'audio');
-      playIncomingRingtone();
+      setIsVideoOff((data.callType || 'audio') === 'audio');
+      try {
+        playIncomingRingtone();
+      } catch (soundErr) {
+        console.warn('Could not play incoming ringtone:', soundErr);
+      }
     };
 
     // Callee accepted call (Caller receives this)
@@ -452,12 +456,13 @@ export const CallProvider = ({ children }) => {
         }, 1000);
 
         // Caller creates peer connection and sends SDP offer
-        const pc = createPeerConnection(data.callee.id, data.callId);
+        const calleeId = Number(data.callee.id);
+        const pc = createPeerConnection(calleeId, data.callId);
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
 
         socket.emit(socketEvents.callSignal, {
-          toUserId: data.callee.id,
+          toUserId: calleeId,
           callId: data.callId,
           signal: {
             type: 'offer',
@@ -527,10 +532,11 @@ export const CallProvider = ({ children }) => {
     const handleCallSignal = async (data) => {
       try {
         const { fromUserId, signal, callId } = data;
+        const peerId = Number(fromUserId);
         let pc = peerConnectionRef.current;
 
         if (!pc) {
-          pc = createPeerConnection(fromUserId, callId);
+          pc = createPeerConnection(peerId, callId);
         }
 
         if (signal.type === 'offer') {
@@ -541,7 +547,7 @@ export const CallProvider = ({ children }) => {
           await pc.setLocalDescription(answer);
 
           socket.emit(socketEvents.callSignal, {
-            toUserId: fromUserId,
+            toUserId: peerId,
             callId,
             signal: {
               type: 'answer',

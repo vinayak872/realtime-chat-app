@@ -1,5 +1,6 @@
 import React, { createContext, useState, useCallback, useEffect } from 'react';
 import { authService } from '../services/api';
+import { disconnectSocket } from '../services/socket';
 
 export const AuthContext = createContext();
 
@@ -43,10 +44,11 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      // Clear local state and storage
+      // Clear local state, storage, and socket connection
       setUser(null);
       setToken(null);
       localStorage.removeItem('token');
+      disconnectSocket();
       setLoading(false);
     }
   }, []);

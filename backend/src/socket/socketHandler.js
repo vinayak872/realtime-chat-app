@@ -13,7 +13,7 @@ export const initializeSocket = (io) => {
     // User comes online
     socket.on('user:online', async (data) => {
       try {
-        const token = data.token;
+        const token = data?.token;
         const decoded = verifyToken(token);
 
         if (!decoded) {
@@ -21,8 +21,9 @@ export const initializeSocket = (io) => {
           return;
         }
 
-        const userId = decoded.userId;
+        const userId = Number(decoded.userId);
         onlineUsers.set(userId, socket.id);
+        onlineUsers.set(String(userId), socket.id);
 
         await User.update({ status: 'online', lastSeen: new Date() }, { where: { id: userId } });
 
@@ -33,8 +34,9 @@ export const initializeSocket = (io) => {
 
         socket.userId = userId;
         socket.join(`user:${userId}`);
+        socket.join(`user:${String(userId)}`);
 
-        console.log(`User ${userId} is now online`);
+        console.log(`User ${userId} is now online (socket: ${socket.id})`);
       } catch (error) {
         console.error('Error in user:online:', error);
       }
@@ -44,7 +46,7 @@ export const initializeSocket = (io) => {
     socket.on('message:send', async (data) => {
       try {
         const { chatId, content, fileUrl, fileType, fileName } = data;
-        const userId = socket.userId;
+        const userId = Number(socket.userId);
 
         if (!chatId || (!content && !fileUrl)) {
           return;
@@ -75,8 +77,8 @@ export const initializeSocket = (io) => {
         };
 
         // Emit to both sender and receiver
-        io.to(`user:${userId}`).emit('message:new', messageData);
-        io.to(`user:${receiverId}`).emit('message:new', messageData);
+        io.to(`user:${userId}`).to(`user:${String(userId)}`).emit('message:new', messageData);
+        io.to(`user:${receiverId}`).to(`user:${String(receiverId)}`).emit('message:new', messageData);
 
         socket.emit('message:sent', {
           id: message.id,
@@ -91,7 +93,7 @@ export const initializeSocket = (io) => {
     socket.on('message:read', async (data) => {
       try {
         const { messageId, chatId } = data;
-        const userId = socket.userId;
+        const userId = Number(socket.userId);
 
         const message = await Message.findByPk(messageId);
         if (message && message.senderId !== userId) {
@@ -102,7 +104,7 @@ export const initializeSocket = (io) => {
           const chat = await Chat.findByPk(chatId);
           const senderId = message.senderId;
 
-          io.to(`user:${senderId}`).emit('message:read-receipt', {
+          io.to(`user:${senderId}`).to(`user:${String(senderId)}`).emit('message:read-receipt', {
             messageId,
             chatId,
           });
@@ -116,7 +118,7 @@ export const initializeSocket = (io) => {
     socket.on('typing:start', (data) => {
       try {
         const { chatId } = data;
-        const userId = socket.userId;
+        const userId = Number(socket.userId);
 
         if (!typingUsers.has(chatId)) {
           typingUsers.set(chatId, new Set());
@@ -137,7 +139,7 @@ export const initializeSocket = (io) => {
     socket.on('typing:stop', (data) => {
       try {
         const { chatId } = data;
-        const userId = socket.userId;
+        const userId = Number(socket.userId);
 
         if (!typingUsers.has(chatId)) {
           typingUsers.set(chatId, new Set());
@@ -163,14 +165,28 @@ export const initializeSocket = (io) => {
     socket.on('call:initiate', async (data) => {
       try {
         const { toUserId, callType = 'audio', chatId } = data;
-        const callerId = socket.userId;
+        const callerId = socket.userId ? Number(socket.userId) : null;
+        const targetUserId = toUserId ? Number(toUserId) : null;
 
-        if (!callerId || !toUserId) return;
+        console.log(`[call:initiate] Caller: ${callerId} -> Recipient: ${targetUserId} (Type: ${callType})`);
 
-        // Check if recipient is online
-        if (!onlineUsers.has(toUserId)) {
+        if (!callerId || !targetUserId) {
+          console.warn(`[call:initiate] Missing callerId (${callerId}) or targetUserId (${targetUserId})`);
+          socket.emit('call:error', { message: 'Invalid call parameters' });
+          return;
+        }
+
+        // Check if recipient is online: check onlineUsers or active socket room
+        const recipientRoom = io.sockets.adapter.rooms.get(`user:${targetUserId}`) ||
+                              io.sockets.adapter.rooms.get(`user:${String(targetUserId)}`);
+        const isRecipientConnected = (recipientRoom && recipientRoom.size > 0) ||
+                                     onlineUsers.has(targetUserId) ||
+                                     onlineUsers.has(String(targetUserId));
+
+        if (!isRecipientConnected) {
+          console.log(`[call:initiate] Recipient ${targetUserId} is offline`);
           socket.emit('call:unavailable', {
-            toUserId,
+            toUserId: targetUserId,
             reason: 'User is currently offline'
           });
           return;
@@ -182,9 +198,9 @@ export const initializeSocket = (io) => {
           return;
         }
 
-        if (userCallMap.has(toUserId)) {
+        if (userCallMap.has(targetUserId)) {
           socket.emit('call:busy', {
-            toUserId,
+            toUserId: targetUserId,
             reason: 'User is on another call'
           });
           return;
@@ -194,7 +210,7 @@ export const initializeSocket = (io) => {
           attributes: ['id', 'username', 'email', 'profilePicture']
         });
 
-        const callId = `call_${Date.now()}_${callerId}_${toUserId}`;
+        const callId = `call_${Date.now()}_${callerId}_${targetUserId}`;
         const callerData = caller
           ? { ...caller.toJSON(), profilePic: caller.profilePicture }
           : { id: callerId, username: 'Caller' };
@@ -202,7 +218,7 @@ export const initializeSocket = (io) => {
         const callData = {
           callId,
           callerId,
-          calleeId: toUserId,
+          calleeId: targetUserId,
           callType,
           chatId,
           startTime: null,
@@ -212,10 +228,12 @@ export const initializeSocket = (io) => {
 
         activeCalls.set(callId, callData);
         userCallMap.set(callerId, callId);
-        userCallMap.set(toUserId, callId);
+        userCallMap.set(targetUserId, callId);
 
-        // Notify recipient with incoming call event
-        io.to(`user:${toUserId}`).emit('call:incoming', {
+        console.log(`[call:initiate] Emitting call:incoming to user:${targetUserId}`);
+
+        // Notify recipient with incoming call event (to both numeric and string rooms)
+        io.to(`user:${targetUserId}`).to(`user:${String(targetUserId)}`).emit('call:incoming', {
           callId,
           fromUserId: callerId,
           caller: callData.caller,
@@ -226,7 +244,7 @@ export const initializeSocket = (io) => {
         // Notify caller that call is ringing
         socket.emit('call:ringing', {
           callId,
-          toUserId,
+          toUserId: targetUserId,
           callType: callData.callType
         });
       } catch (error) {
@@ -249,16 +267,19 @@ export const initializeSocket = (io) => {
         call.status = 'active';
         call.startTime = Date.now();
 
-        const callee = await User.findByPk(socket.userId, {
+        const calleeId = Number(socket.userId);
+        const callee = await User.findByPk(calleeId, {
           attributes: ['id', 'username', 'email', 'profilePicture']
         });
 
         const calleeData = callee
           ? { ...callee.toJSON(), profilePic: callee.profilePicture }
-          : { id: socket.userId };
+          : { id: calleeId };
+
+        console.log(`[call:accept] Call ${callId} accepted by ${calleeId}`);
 
         // Notify caller that call was accepted
-        io.to(`user:${call.callerId}`).emit('call:accepted', {
+        io.to(`user:${call.callerId}`).to(`user:${String(call.callerId)}`).emit('call:accepted', {
           callId,
           callee: calleeData
         });
@@ -280,7 +301,8 @@ export const initializeSocket = (io) => {
         const call = activeCalls.get(callId);
 
         if (call) {
-          io.to(`user:${call.callerId}`).emit('call:rejected', {
+          console.log(`[call:reject] Call ${callId} rejected: ${reason}`);
+          io.to(`user:${call.callerId}`).to(`user:${String(call.callerId)}`).emit('call:rejected', {
             callId,
             reason
           });
@@ -307,8 +329,8 @@ export const initializeSocket = (io) => {
               isRead: false
             };
 
-            io.to(`user:${call.callerId}`).emit('message:new', messageData);
-            io.to(`user:${call.calleeId}`).emit('message:new', messageData);
+            io.to(`user:${call.callerId}`).to(`user:${String(call.callerId)}`).emit('message:new', messageData);
+            io.to(`user:${call.calleeId}`).to(`user:${String(call.calleeId)}`).emit('message:new', messageData);
           }
 
           userCallMap.delete(call.callerId);
@@ -324,11 +346,12 @@ export const initializeSocket = (io) => {
     socket.on('call:signal', (data) => {
       try {
         const { toUserId, signal, callId } = data;
-        const fromUserId = socket.userId;
+        const fromUserId = Number(socket.userId);
+        const targetId = Number(toUserId);
 
-        if (!toUserId || !signal) return;
+        if (!targetId || !signal) return;
 
-        io.to(`user:${toUserId}`).emit('call:signal', {
+        io.to(`user:${targetId}`).to(`user:${String(targetId)}`).emit('call:signal', {
           fromUserId,
           signal,
           callId
@@ -342,8 +365,9 @@ export const initializeSocket = (io) => {
     socket.on('call:media-state', (data) => {
       try {
         const { toUserId, mediaType, enabled, callId } = data;
-        io.to(`user:${toUserId}`).emit('call:media-state', {
-          fromUserId: socket.userId,
+        const targetId = Number(toUserId);
+        io.to(`user:${targetId}`).to(`user:${String(targetId)}`).emit('call:media-state', {
+          fromUserId: Number(socket.userId),
           mediaType,
           enabled,
           callId
@@ -360,7 +384,8 @@ export const initializeSocket = (io) => {
         const call = activeCalls.get(callId);
 
         if (call) {
-          const otherUserId = socket.userId === call.callerId ? call.calleeId : call.callerId;
+          const currentUserId = Number(socket.userId);
+          const otherUserId = currentUserId === call.callerId ? call.calleeId : call.callerId;
 
           let durationSeconds = 0;
           if (call.startTime) {
@@ -371,7 +396,9 @@ export const initializeSocket = (io) => {
           const seconds = durationSeconds % 60;
           const durationFormatted = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 
-          io.to(`user:${otherUserId}`).emit('call:ended', {
+          console.log(`[call:end] Call ${callId} ended by ${currentUserId}, duration: ${durationFormatted}`);
+
+          io.to(`user:${otherUserId}`).to(`user:${String(otherUserId)}`).emit('call:ended', {
             callId,
             duration: durationSeconds,
             reason: 'Call ended'
@@ -419,8 +446,8 @@ export const initializeSocket = (io) => {
               isRead: false
             };
 
-            io.to(`user:${call.callerId}`).emit('message:new', messageData);
-            io.to(`user:${call.calleeId}`).emit('message:new', messageData);
+            io.to(`user:${call.callerId}`).to(`user:${String(call.callerId)}`).emit('message:new', messageData);
+            io.to(`user:${call.calleeId}`).to(`user:${String(call.calleeId)}`).emit('message:new', messageData);
           }
 
           userCallMap.delete(call.callerId);
@@ -435,7 +462,7 @@ export const initializeSocket = (io) => {
     // User comes offline / disconnects
     socket.on('disconnect', async () => {
       try {
-        const userId = socket.userId;
+        const userId = socket.userId ? Number(socket.userId) : null;
 
         if (userId) {
           // If user was in an active call, terminate it cleanly
@@ -445,7 +472,7 @@ export const initializeSocket = (io) => {
 
             if (call) {
               const otherUserId = userId === call.callerId ? call.calleeId : call.callerId;
-              io.to(`user:${otherUserId}`).emit('call:ended', {
+              io.to(`user:${otherUserId}`).to(`user:${String(otherUserId)}`).emit('call:ended', {
                 callId,
                 reason: 'User disconnected'
               });
@@ -456,15 +483,19 @@ export const initializeSocket = (io) => {
             }
           }
 
-          onlineUsers.delete(userId);
-          await User.update({ status: 'offline', lastSeen: new Date() }, { where: { id: userId } });
+          const remainingRoom = io.sockets.adapter.rooms.get(`user:${userId}`) || io.sockets.adapter.rooms.get(`user:${String(userId)}`);
+          if (!remainingRoom || remainingRoom.size === 0) {
+            onlineUsers.delete(userId);
+            onlineUsers.delete(String(userId));
+            await User.update({ status: 'offline', lastSeen: new Date() }, { where: { id: userId } }).catch(() => {});
 
-          io.emit('user:status-change', {
-            userId,
-            status: 'offline',
-          });
+            io.emit('user:status-change', {
+              userId,
+              status: 'offline',
+            });
 
-          console.log(`User ${userId} is now offline`);
+            console.log(`User ${userId} is now offline`);
+          }
         }
 
         console.log('User disconnected:', socket.id);
