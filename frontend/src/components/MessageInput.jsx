@@ -1,21 +1,22 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useRef } from 'react';
 import { ChatContext } from '../context/ChatContext';
-import { AuthContext } from '../context/AuthContext';
 import { messageService } from '../services/api';
 import { getSocket, socketEvents } from '../services/socket';
-import VoiceRecorder from "./VoiceRecorder";
+import VoiceRecorder from './VoiceRecorder';
+import { Paperclip, Send, X, FileText } from 'lucide-react';
 
 const MessageInput = () => {
-  const { currentChat, addMessage } = useContext(ChatContext);
-  const { user } = useContext(AuthContext);
+  const { currentChat } = useContext(ChatContext);
   const [content, setContent] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [file, setFile] = useState(null);
-  const socket = getSocket();
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   if (!currentChat) return null;
 
   const handleSendVoice = ({ fileUrl, fileType, fileName }) => {
+    const socket = getSocket();
     socket?.emit(socketEvents.messageSend, {
       chatId: currentChat.id,
       content: null,
@@ -27,6 +28,7 @@ const MessageInput = () => {
 
   const handleTyping = (e) => {
     setContent(e.target.value);
+    const socket = getSocket();
     if (!isTyping) {
       setIsTyping(true);
       socket?.emit(socketEvents.typingStart, { chatId: currentChat.id });
@@ -36,6 +38,7 @@ const MessageInput = () => {
   const handleTypingStop = () => {
     if (isTyping) {
       setIsTyping(false);
+      const socket = getSocket();
       socket?.emit(socketEvents.typingStop, { chatId: currentChat.id });
     }
   };
@@ -43,32 +46,28 @@ const MessageInput = () => {
   const handleFileSelect = async (e) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
+
+    setIsUploading(true);
     const formData = new FormData();
     formData.append('file', selectedFile);
+
     try {
       const response = await messageService.uploadFile(formData);
       setFile(response.data);
-      handleSendFile(response.data);
     } catch (error) {
       console.error('Error uploading file:', error);
       alert('Failed to upload file');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  const handleSendFile = (fileData) => {
-    socket?.emit(socketEvents.messageSend, {
-      chatId: currentChat.id,
-      content: null,
-      fileUrl: fileData.fileUrl,
-      fileType: fileData.fileType,
-      fileName: fileData.fileName,
-    });
-    setFile(null);
-  };
-
   const handleSendMessage = () => {
-    if (!content.trim() && !file) return;
+    if ((!content.trim() && !file) || isUploading) return;
     handleTypingStop();
+
+    const socket = getSocket();
     socket?.emit(socketEvents.messageSend, {
       chatId: currentChat.id,
       content: content.trim() || null,
@@ -76,6 +75,7 @@ const MessageInput = () => {
       fileType: file?.fileType || null,
       fileName: file?.fileName || null,
     });
+
     setContent('');
     setFile(null);
   };
@@ -87,42 +87,70 @@ const MessageInput = () => {
     }
   };
 
+  const canSend = (content.trim().length > 0 || file) && !isUploading;
+
   return (
-    <div className="border-t border-gray-200 p-2 md:p-4 bg-white shrink-0">
-      {file && (
-        <div className="bg-light p-2 rounded mb-2 flex justify-between items-center text-sm">
-          <span>📎 {file.fileName}</span>
-          <button onClick={() => setFile(null)} className="text-red-500">✕</button>
+    <div className="border-t border-white/10 bg-[#0F172A]/95 backdrop-blur-xl p-2.5 sm:p-4 pb-safe shrink-0">
+      {/* Uploading Status / Selected File Chip */}
+      {(file || isUploading) && (
+        <div className="mb-2 p-2 px-3 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between text-xs text-slate-300 animate-slide-up">
+          <div className="flex items-center gap-2 truncate">
+            <FileText className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="truncate">
+              {isUploading ? 'Uploading file...' : file?.fileName}
+            </span>
+          </div>
+          {!isUploading && (
+            <button
+              onClick={() => setFile(null)}
+              className="p-1 text-slate-400 hover:text-white rounded-lg transition"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       )}
-      <div className="flex gap-2 md:gap-3 items-end">
-        <label className="cursor-pointer text-primary hover:text-green-700 transition">
-          <span>📎</span>
+
+      {/* Floating Input Row */}
+      <div className="flex items-center gap-1.5 sm:gap-2 bg-[#0B0F19] rounded-2xl p-1.5 border border-white/10 focus-within:border-emerald-500/50 transition-colors">
+        {/* Attachment Button */}
+        <label className="p-2 text-slate-400 hover:text-emerald-400 hover:bg-white/5 rounded-xl cursor-pointer transition active:scale-95 shrink-0">
+          <Paperclip className="w-5 h-5" />
           <input
+            ref={fileInputRef}
             type="file"
             onChange={handleFileSelect}
             className="hidden"
           />
         </label>
 
-        <VoiceRecorder chatId={currentChat.id} onSent={handleSendVoice} />
-
+        {/* Text Input Area */}
         <textarea
           value={content}
           onChange={handleTyping}
           onBlur={handleTypingStop}
-          onKeyPress={handleKeyPress}
-          placeholder="Type a message..."
-          className="flex-1 border border-gray-300 rounded-lg px-2 md:px-3 py-2 focus:outline-none focus:border-primary resize-none message-input text-sm md:text-base min-w-0"
-          rows="1"
-          style={{ minHeight: '40px' }}
+          onKeyDown={handleKeyPress}
+          placeholder="Message..."
+          rows={1}
+          className="flex-1 bg-transparent text-white placeholder-slate-500 text-sm sm:text-base px-2 py-1.5 focus:outline-none resize-none max-h-32 min-w-0"
+          style={{ minHeight: '28px' }}
         />
+
+        {/* Voice Note Recorder Button */}
+        <VoiceRecorder chatId={currentChat.id} onSent={handleSendVoice} />
+
+        {/* Send Button */}
         <button
           onClick={handleSendMessage}
-          disabled={!content.trim() && !file}
-          className="bg-primary text-white rounded-lg px-3 md:px-4 py-2 text-sm md:text-base hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+          disabled={!canSend}
+          className={`p-2.5 rounded-xl transition-all duration-200 shrink-0 flex items-center justify-center ${
+            canSend
+              ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/25 active:scale-95'
+              : 'text-slate-600 cursor-not-allowed'
+          }`}
+          title="Send message"
         >
-          Send
+          <Send className="w-4 h-4 sm:w-5 sm:h-5" />
         </button>
       </div>
     </div>

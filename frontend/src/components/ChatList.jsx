@@ -4,13 +4,41 @@ import { ChatContext } from '../context/ChatContext';
 import { AuthContext } from '../context/AuthContext';
 import { chatService, authService } from '../services/api';
 import { getSocket, socketEvents } from '../services/socket';
+import {
+  Search,
+  LogOut,
+  Users,
+  MessageSquare,
+  CheckCheck,
+  Check,
+  X,
+  Phone,
+  Video,
+  Mic,
+} from 'lucide-react';
+
+const formatChatTime = (timestamp) => {
+  if (!timestamp) return '';
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffInHours = (now - date) / (1000 * 60 * 60);
+
+  if (diffInHours < 24 && date.getDate() === now.getDate()) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  if (diffInHours < 48) {
+    return 'Yesterday';
+  }
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+};
 
 const ChatList = () => {
   const { chats, setChats, currentChat, setCurrentChat, unreadCounts, setUnreadCounts } = useContext(ChatContext);
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
+
   const [searchTerm, setSearchTerm] = useState('');
-  const [showUserList, setShowUserList] = useState(true);
+  const [activeTab, setActiveTab] = useState('chats'); // 'chats' | 'users'
   const [allUsers, setAllUsers] = useState([]);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
@@ -24,10 +52,8 @@ const ChatList = () => {
       }
     };
 
-    if (showUserList) {
-      fetchAllUsers();
-    }
-  }, [showUserList]);
+    fetchAllUsers();
+  }, []);
 
   // Listen for new messages to update the chat list sorting and unread counts
   useEffect(() => {
@@ -41,12 +67,11 @@ const ChatList = () => {
           const updatedChat = { ...prevChats[chatIndex], lastMessage: message };
           const newChats = [...prevChats];
           newChats.splice(chatIndex, 1);
-          return [updatedChat, ...newChats]; // Move chat to the top
+          return [updatedChat, ...newChats];
         }
         return prevChats;
       });
 
-      // Increment unread count if the chat is not currently open
       if (currentChat?.id !== message.chatId) {
         setUnreadCounts((prev) => ({
           ...prev,
@@ -75,7 +100,7 @@ const ChatList = () => {
         return [newChat, ...prev];
       });
       setCurrentChat(newChat);
-      setShowUserList(false);
+      setActiveTab('chats');
     } catch (error) {
       console.error('Error creating chat:', error);
     }
@@ -90,7 +115,7 @@ const ChatList = () => {
     }
   };
 
-  // Sort chats by latest message timestamp, then filter by search term
+  // Sort chats by latest message timestamp
   const sortedChats = [...chats].sort((a, b) => {
     const dateA = a.lastMessage?.createdAt ? new Date(a.lastMessage.createdAt) : new Date(a.createdAt);
     const dateB = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt) : new Date(b.createdAt);
@@ -98,144 +123,301 @@ const ChatList = () => {
   });
 
   const filteredChats = sortedChats.filter((chat) =>
-    chat.otherUser.username.toLowerCase().includes(searchTerm.toLowerCase())
+    chat.otherUser?.username?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const otherUsers = allUsers.filter((u) => u.id !== user?.id);
+  const onlineContacts = otherUsers.filter((u) => u.status === 'online');
+
+  const filteredUsers = otherUsers.filter((u) =>
+    u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const totalUnreads = Object.values(unreadCounts).reduce((acc, count) => acc + count, 0);
+
   return (
-    <div className={`bg-white border-r border-gray-200 flex-col h-full shrink-0 ${currentChat ? 'hidden md:flex md:w-80' : 'flex w-full md:w-80'}`}>
-      {/* User Profile Section */}
-      <div className="p-4 border-b border-gray-200 bg-light">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 flex-1">
-            <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-semibold">
-              {user?.username.charAt(0).toUpperCase()}
+    <div className="flex flex-col h-full w-full bg-[#0F172A] text-slate-100 select-none overflow-hidden">
+      {/* Phone App Bar Header */}
+      <div className="p-4 sm:p-5 border-b border-white/10 bg-[#0F172A]/90 backdrop-blur-md shrink-0">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            {/* User Avatar with status */}
+            <div className="relative">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-500 to-cyan-500 p-0.5 shadow-md shadow-emerald-500/10">
+                <div className="w-full h-full rounded-[14px] bg-[#0B0F19] text-white font-bold flex items-center justify-center text-base">
+                  {user?.profilePicture ? (
+                    <img
+                      src={user.profilePicture}
+                      alt={user.username}
+                      className="w-full h-full rounded-[14px] object-cover"
+                    />
+                  ) : (
+                    user?.username?.charAt(0).toUpperCase() || 'U'
+                  )}
+                </div>
+              </div>
+              <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-[#0F172A]" />
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm truncate">{user?.username}</p>
-              <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+
+            <div>
+              <h1 className="font-bold text-lg text-white leading-tight">{user?.username}</h1>
+              <p className="text-xs text-emerald-400 font-medium flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Active Now
+              </p>
             </div>
           </div>
-          <button
-            onClick={() => setShowProfileMenu(!showProfileMenu)}
-            className="text-gray-600 hover:text-primary rounded-full p-1 transition"
-            title="Profile menu"
-          >
-            ⋮
-          </button>
-        </div>
 
-        {/* Profile Menu Dropdown */}
-        {showProfileMenu && (
-          <div className="mt-2 bg-white border border-gray-200 rounded-lg shadow-md z-10">
+          {/* Action Menu Toggle */}
+          <div className="relative">
             <button
-              onClick={handleLogout}
-              className="w-full text-left px-4 py-2 hover:bg-light text-red-600 font-semibold rounded transition text-sm"
+              onClick={() => setShowProfileMenu(!showProfileMenu)}
+              className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition"
+              title="Menu"
             >
-              Logout
+              <LogOut className="w-5 h-5 text-rose-400" />
             </button>
-          </div>
-        )}
-      </div>
 
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold text-primary">Chats</h1>
-          <button
-            onClick={() => setShowUserList(!showUserList)}
-            className="text-primary hover:bg-light rounded-full p-2 transition"
-            title="Start new chat"
-          >
-            ✏️
-          </button>
-        </div>
-        <input
-          type="text"
-          placeholder="Search chats..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full px-3 py-2 bg-white border border-gray-300 rounded-full focus:outline-none focus:border-primary text-sm"
-        />
-      </div>
-
-      {/* User List */}
-      {showUserList && (
-        <div className="border-b border-gray-200 max-h-60 overflow-y-auto">
-          <div className="p-2">
-            <h3 className="text-sm font-semibold text-gray-600 px-2 py-2">Contacts</h3>
-            {allUsers.length > 0 ? (
-              allUsers.map((u) => (
+            {/* Logout Dropdown Confirmation */}
+            {showProfileMenu && (
+              <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-gray-900 border border-white/10 shadow-2xl p-2 z-50 animate-slide-up">
+                <div className="px-3 py-2 border-b border-white/10 mb-1">
+                  <p className="text-xs text-slate-400">Signed in as</p>
+                  <p className="text-sm font-semibold text-white truncate">{user?.email}</p>
+                </div>
                 <button
-                  key={u.id}
-                  onClick={() => handleStartChat(u.id)}
-                  className="w-full text-left px-3 py-2 hover:bg-light rounded transition flex items-center gap-3"
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-rose-400 hover:bg-rose-500/10 transition text-sm font-medium"
                 >
-                  <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-semibold">
-                    {u.username.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm truncate">{u.username}</p>
-                    <p className="text-xs text-gray-500 truncate">{u.email}</p>
-                  </div>
+                  <LogOut className="w-4 h-4" />
+                  <span>Log Out</span>
                 </button>
-              ))
-            ) : (
-              <p className="text-center text-gray-400 py-4">No users available</p>
+              </div>
             )}
+          </div>
+        </div>
+
+        {/* Search Bar Input */}
+        <div className="relative">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            placeholder={activeTab === 'chats' ? 'Search messages or people...' : 'Search all contacts...'}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-9 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Horizontal Active / Online Users Story Carousel */}
+      {onlineContacts.length > 0 && (
+        <div className="py-3 px-4 border-b border-white/5 bg-[#0B0F19]/50 shrink-0">
+          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
+            Active Friends ({onlineContacts.length})
+          </p>
+          <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-1">
+            {onlineContacts.map((contact) => (
+              <button
+                key={contact.id}
+                onClick={() => handleStartChat(contact.id)}
+                className="flex flex-col items-center gap-1.5 shrink-0 group focus:outline-none"
+              >
+                <div className="relative">
+                  <div className="w-13 h-13 rounded-2xl bg-gradient-to-tr from-emerald-500 to-cyan-500 p-0.5 group-hover:scale-105 transition-transform duration-200">
+                    <div className="w-12 h-12 rounded-[14px] bg-[#0F172A] text-white font-bold flex items-center justify-center text-sm">
+                      {contact.username.charAt(0).toUpperCase()}
+                    </div>
+                  </div>
+                  <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-[#0B0F19] ring-1 ring-emerald-400" />
+                </div>
+                <span className="text-xs font-medium text-slate-300 group-hover:text-white max-w-[60px] truncate text-center">
+                  {contact.username}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
       )}
 
-      {/* Chat List */}
-      <div className="flex-1 overflow-y-auto">
-        {filteredChats.length > 0 ? (
-          filteredChats.map((chat) => {
-            const unreadCount = unreadCounts[chat.id] || 0;
-            const isUnread = unreadCount > 0;
-            const isSelected = currentChat?.id === chat.id;
+      {/* Modern Tab Switcher */}
+      <div className="px-4 pt-3 pb-1 shrink-0 flex items-center gap-2">
+        <button
+          onClick={() => setActiveTab('chats')}
+          className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition ${
+            activeTab === 'chats'
+              ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20'
+              : 'bg-white/5 text-slate-400 hover:text-slate-200 hover:bg-white/10'
+          }`}
+        >
+          <MessageSquare className="w-4 h-4" />
+          <span>Chats</span>
+          {totalUnreads > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-white text-emerald-700 font-bold">
+              {totalUnreads}
+            </span>
+          )}
+        </button>
 
-            return (
-            <button
-              key={chat.id}
-              onClick={() => {
-                setCurrentChat(chat);
-                setUnreadCounts((prev) => ({ ...prev, [chat.id]: 0 }));
-              }}
-              className={`w-full p-3 border-b border-gray-100 transition text-left flex items-center ${
-                isSelected ? 'bg-light' : isUnread ? 'bg-green-50' : 'hover:bg-light'
-              }`}
-            >
-              <div className="flex gap-3 w-full">
-                <div className="w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center font-semibold flex-shrink-0">
-                  {chat.otherUser.username.charAt(0).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0 flex flex-col justify-center">
-                  <div className="flex justify-between items-center">
-                    <p className={`text-sm truncate ${isUnread ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>
-                      {chat.otherUser.username}
-                    </p>
-                    <span className={`text-xs flex-shrink-0 ml-2 ${isUnread ? 'text-green-600 font-semibold' : 'text-gray-400'}`}>
-                      {chat.lastMessage && new Date(chat.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center mt-1">
-                    <p className={`text-sm truncate ${isUnread ? 'font-semibold text-gray-800' : 'text-gray-500'}`}>
-                      {chat.lastMessage?.content || (chat.lastMessage?.fileUrl ? '📎 File attached' : 'No messages yet')}
-                    </p>
-                    {isUnread && (
-                      <span className="bg-green-500 text-white text-xs font-bold px-2 py-0.5 rounded-full ml-2 flex-shrink-0">
-                        {unreadCount}
-                      </span>
+        <button
+          onClick={() => setActiveTab('users')}
+          className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition ${
+            activeTab === 'users'
+              ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20'
+              : 'bg-white/5 text-slate-400 hover:text-slate-200 hover:bg-white/10'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>All Users</span>
+          <span className="text-[10px] opacity-70">({otherUsers.length})</span>
+        </button>
+      </div>
+
+      {/* Main List Content */}
+      <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
+        {activeTab === 'chats' ? (
+          /* Recent Chats Tab */
+          filteredChats.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64 text-center p-6 text-slate-400">
+              <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mb-3">
+                <MessageSquare className="w-6 h-6 text-slate-500" />
+              </div>
+              <p className="text-sm font-medium text-slate-300">No conversations found</p>
+              <p className="text-xs text-slate-500 mt-1 max-w-[200px]">
+                {searchTerm ? 'Try a different search term' : 'Switch to the "All Users" tab to start your first conversation!'}
+              </p>
+              {!searchTerm && (
+                <button
+                  onClick={() => setActiveTab('users')}
+                  className="mt-4 px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-xs font-semibold transition"
+                >
+                  Browse Users
+                </button>
+              )}
+            </div>
+          ) : (
+            filteredChats.map((chat) => {
+              const isSelected = currentChat?.id === chat.id;
+              const unread = unreadCounts[chat.id] || 0;
+              const lastMsg = chat.lastMessage;
+              const isLastMsgMe = lastMsg && lastMsg.senderId === user?.id;
+
+              return (
+                <button
+                  key={chat.id}
+                  onClick={() => {
+                    setCurrentChat(chat);
+                    setUnreadCounts((prev) => ({ ...prev, [chat.id]: 0 }));
+                  }}
+                  className={`w-full p-3 rounded-2xl flex items-center gap-3 text-left transition-all duration-150 ${
+                    isSelected
+                      ? 'bg-emerald-500/15 border border-emerald-500/30'
+                      : 'hover:bg-white/5 active:bg-white/10'
+                  }`}
+                >
+                  {/* Contact Avatar */}
+                  <div className="relative shrink-0">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-cyan-500 p-0.5 shadow-sm">
+                      <div className="w-full h-full rounded-[14px] bg-[#0B0F19] text-white font-bold flex items-center justify-center text-base">
+                        {chat.otherUser?.username?.charAt(0).toUpperCase() || '?'}
+                      </div>
+                    </div>
+                    {chat.otherUser?.status === 'online' && (
+                      <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-[#0F172A]" />
                     )}
                   </div>
-                </div>
-              </div>
-            </button>
-          )})
+
+                  {/* Chat Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <h3 className="font-semibold text-sm text-white truncate">
+                        {chat.otherUser?.username}
+                      </h3>
+                      <span className="text-[11px] text-slate-400 shrink-0 ml-2">
+                        {formatChatTime(lastMsg?.createdAt || chat.createdAt)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs text-slate-400 truncate flex items-center gap-1">
+                        {isLastMsgMe && (
+                          <CheckCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        )}
+                        {lastMsg?.fileType === 'audio' ? (
+                          <span className="flex items-center gap-1 text-slate-300">
+                            <Mic className="w-3 h-3 text-emerald-400" /> Voice message
+                          </span>
+                        ) : lastMsg?.fileType?.startsWith('call') ? (
+                          <span className="flex items-center gap-1 text-slate-300">
+                            <Phone className="w-3 h-3 text-cyan-400" /> {lastMsg.content}
+                          </span>
+                        ) : (
+                          lastMsg?.content || lastMsg?.fileName || 'No messages yet'
+                        )}
+                      </p>
+
+                      {unread > 0 && (
+                        <span className="shrink-0 px-2 py-0.5 rounded-full bg-emerald-500 text-white font-bold text-[11px] shadow-sm">
+                          {unread}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              );
+            })
+          )
         ) : (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-gray-400">No chats yet</p>
-          </div>
+          /* All Users Directory Tab */
+          filteredUsers.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64 text-center p-6 text-slate-400">
+              <Users className="w-8 h-8 text-slate-500 mb-2" />
+              <p className="text-sm font-medium">No users found</p>
+            </div>
+          ) : (
+            filteredUsers.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => handleStartChat(item.id)}
+                className="w-full p-3 rounded-2xl flex items-center justify-between text-left hover:bg-white/5 active:bg-white/10 transition"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="relative shrink-0">
+                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-500 to-cyan-500 p-0.5 shadow-sm">
+                      <div className="w-full h-full rounded-[14px] bg-[#0B0F19] text-white font-bold flex items-center justify-center text-sm">
+                        {item.username.charAt(0).toUpperCase()}
+                      </div>
+                    </div>
+                    {item.status === 'online' && (
+                      <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[#0F172A]" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="font-semibold text-sm text-white truncate">{item.username}</h4>
+                    <p className="text-xs text-slate-400 truncate">
+                      {item.status === 'online' ? (
+                        <span className="text-emerald-400">Online</span>
+                      ) : (
+                        item.email
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                <span className="px-3 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/20 transition">
+                  Chat
+                </span>
+              </button>
+            ))
+          )
         )}
       </div>
     </div>

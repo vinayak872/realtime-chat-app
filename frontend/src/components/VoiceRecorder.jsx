@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { messageService } from "../services/api";
+import { Mic, Square } from "lucide-react";
 
 const VoiceRecorder = ({ chatId, onSent }) => {
   const [recording, setRecording] = useState(false);
@@ -28,7 +29,6 @@ const VoiceRecorder = ({ chatId, onSent }) => {
       };
 
       recorder.onstop = () => {
-        // Safely stop tracks after the recorder finishes compiling data
         stream.getTracks().forEach((t) => t.stop());
         upload();
       };
@@ -53,25 +53,21 @@ const VoiceRecorder = ({ chatId, onSent }) => {
   const upload = async () => {
     if (chunksRef.current.length === 0) return;
 
-    // Get actual mime type from recorded chunks (crucial for Safari/mobile support)
     const actualMimeType = chunksRef.current[0]?.type || getMimeType() || "audio/webm";
     const baseMimeType = actualMimeType.split(";")[0] || "audio/webm";
     let ext = actualMimeType.split("/")[1]?.split(";")[0] || "webm";
-    
-    // Normalize extensions
+
     if (ext.includes("mp4") || ext.includes("m4a")) ext = "mp4";
     else if (ext.includes("ogg") || ext.includes("opus")) ext = "ogg";
 
     const blob = new Blob(chunksRef.current, { type: actualMimeType });
 
-    // Ignore if recording is empty or just a rapid click (less than 1KB)
     if (blob.size < 1000) {
       console.warn("Recording was too short");
-      return; 
+      return;
     }
 
     const formData = new FormData();
-    // Creating a proper File object instead of a raw Blob for better backend compatibility
     const file = new File([blob], `voice.${ext}`, { type: baseMimeType });
     formData.append("file", file);
 
@@ -96,15 +92,16 @@ const VoiceRecorder = ({ chatId, onSent }) => {
       onMouseUp={stop}
       onTouchStart={(e) => { e.preventDefault(); start(); }}
       onTouchEnd={(e) => { e.preventDefault(); stop(); }}
-      className={`flex items-center gap-1 px-3 py-2 rounded-full text-sm font-medium transition select-none
-        ${recording
-          ? "bg-red-500 text-white animate-pulse"
-          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-        }`}
-      title={recording ? "Release to send" : "Hold to record"}
+      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition select-none ${
+        recording
+          ? "bg-rose-500 text-white animate-pulse shadow-lg shadow-rose-500/30"
+          : "text-slate-400 hover:text-emerald-400 hover:bg-white/5 active:scale-95"
+      }`}
+      title={recording ? "Release to send" : "Hold to record voice"}
       type="button"
     >
-      🎤 {recording ? formatDuration(duration) : ""}
+      <Mic className="w-4 h-4" />
+      {recording && <span>{formatDuration(duration)}</span>}
     </button>
   );
 };

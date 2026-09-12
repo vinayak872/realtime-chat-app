@@ -4,7 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import { CallContext } from '../context/CallContext';
 import { chatService, messageService } from '../services/api';
 import { getSocket, socketEvents } from '../services/socket';
-import { Phone, Video } from 'lucide-react';
+import { Phone, Video, ChevronLeft, Shield } from 'lucide-react';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 
@@ -23,9 +23,9 @@ const ChatWindow = () => {
       try {
         const response = await chatService.getChatMessages(currentChat.id);
         setMessages(response.data.messages);
-        
-        // Clear unread counts for this chat when opened
-        setUnreadCounts(prev => ({ ...prev, [currentChat.id]: 0 }));
+
+        // Clear unread counts for this chat
+        setUnreadCounts((prev) => ({ ...prev, [currentChat.id]: 0 }));
 
         // Mark all as read
         await messageService.markChatAsRead(currentChat.id);
@@ -37,7 +37,7 @@ const ChatWindow = () => {
     };
 
     fetchMessages();
-  }, [currentChat?.id]);
+  }, [currentChat?.id, setMessages, setUnreadCounts]);
 
   useEffect(() => {
     const socket = getSocket();
@@ -59,7 +59,7 @@ const ChatWindow = () => {
       socket.off(socketEvents.messageNew);
       socket.off(socketEvents.messageReadReceipt);
     };
-  }, [currentChat?.id]);
+  }, [currentChat?.id, addMessage, markMessageAsRead]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -88,31 +88,50 @@ const ChatWindow = () => {
   };
 
   const isCallDisabled = callStatus !== 'idle';
+  const isOnline = currentChat.otherUser?.status === 'online';
 
   return (
-    <div className="flex-1 flex flex-col bg-white h-full w-full max-w-full overflow-hidden">
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200 bg-white flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-3">
+    <div className="flex-1 flex flex-col bg-[#0B0F19] text-slate-100 h-full w-full max-w-full overflow-hidden relative">
+      {/* Sticky Native Phone & Desktop Header */}
+      <div className="p-3 sm:p-4 border-b border-white/10 bg-[#0F172A]/95 backdrop-blur-xl flex items-center justify-between z-20 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          {/* Mobile Back to Chats Button */}
           <button
             onClick={() => setCurrentChat(null)}
-            className="md:hidden p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-full transition"
+            className="md:hidden p-2 -ml-1 text-slate-300 hover:text-white active:scale-95 rounded-xl hover:bg-white/10 transition"
             title="Back to chats"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
+            <ChevronLeft className="w-6 h-6" />
           </button>
-          <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-semibold shadow-inner">
-            {currentChat.otherUser.username.charAt(0).toUpperCase()}
+
+          {/* Contact Avatar */}
+          <div className="relative shrink-0">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-tr from-emerald-500 to-cyan-500 p-0.5 shadow-sm">
+              <div className="w-full h-full rounded-[14px] bg-[#0B0F19] text-white font-bold flex items-center justify-center text-sm sm:text-base">
+                {currentChat.otherUser?.username?.charAt(0).toUpperCase() || '?'}
+              </div>
+            </div>
+            {isOnline && (
+              <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-[#0F172A]" />
+            )}
           </div>
-          <div>
-            <p className="font-semibold text-gray-900 leading-tight">{currentChat.otherUser.username}</p>
-            <p className="text-xs text-gray-500">
-              {currentChat.otherUser.status === 'online' ? (
-                <span className="text-emerald-600 font-medium">● Online</span>
+
+          {/* Contact Details */}
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <h2 className="font-semibold text-sm sm:text-base text-white truncate leading-tight">
+                {currentChat.otherUser?.username}
+              </h2>
+            </div>
+            <p className="text-xs truncate">
+              {isOnline ? (
+                <span className="text-emerald-400 font-medium">● Active now</span>
+              ) : currentChat.otherUser?.lastSeen ? (
+                <span className="text-slate-400">
+                  Last seen {new Date(currentChat.otherUser.lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
               ) : (
-                `Last seen at ${new Date(currentChat.otherUser.lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                <span className="text-slate-500">Offline</span>
               )}
             </p>
           </div>
@@ -123,12 +142,12 @@ const ChatWindow = () => {
           <button
             onClick={handleStartAudioCall}
             disabled={isCallDisabled}
-            className={`p-2.5 rounded-full transition duration-150 flex items-center justify-center ${
+            className={`p-2.5 rounded-xl transition-all duration-150 flex items-center justify-center ${
               isCallDisabled
-                ? 'text-gray-300 cursor-not-allowed'
-                : 'text-primary hover:bg-primary/10 hover:text-primary active:scale-95'
+                ? 'text-slate-600 cursor-not-allowed'
+                : 'text-slate-300 hover:text-emerald-400 hover:bg-emerald-500/10 active:scale-95'
             }`}
-            title="Start voice call"
+            title="Voice Call"
           >
             <Phone className="w-5 h-5" />
           </button>
@@ -136,23 +155,27 @@ const ChatWindow = () => {
           <button
             onClick={handleStartVideoCall}
             disabled={isCallDisabled}
-            className={`p-2.5 rounded-full transition duration-150 flex items-center justify-center ${
+            className={`p-2.5 rounded-xl transition-all duration-150 flex items-center justify-center ${
               isCallDisabled
-                ? 'text-gray-300 cursor-not-allowed'
-                : 'text-primary hover:bg-primary/10 hover:text-primary active:scale-95'
+                ? 'text-slate-600 cursor-not-allowed'
+                : 'text-slate-300 hover:text-cyan-400 hover:bg-cyan-500/10 active:scale-95'
             }`}
-            title="Start video call"
+            title="Video Call"
           >
             <Video className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      {/* Messages */}
-      <MessageList ref={messagesEndRef} loading={loading} />
+      {/* Messages Canvas Area */}
+      <div className="flex-1 overflow-hidden relative flex flex-col bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900/30 via-[#0B0F19] to-[#0B0F19]">
+        <MessageList ref={messagesEndRef} loading={loading} />
+      </div>
 
-      {/* Input */}
-      <MessageInput />
+      {/* Modern Phone Bottom Input Bar */}
+      <div className="shrink-0 z-20">
+        <MessageInput />
+      </div>
     </div>
   );
 };

@@ -2,7 +2,7 @@ import React, { useContext, forwardRef } from 'react';
 import { ChatContext } from '../context/ChatContext';
 import { AuthContext } from '../context/AuthContext';
 import VoiceMessage from './VoiceMessage';
-import { PhoneCall, PhoneMissed, PhoneOff, Video } from 'lucide-react';
+import { PhoneCall, PhoneMissed, PhoneOff, Video, CheckCheck, Check, Paperclip, MessageSquare } from 'lucide-react';
 
 const getFullUrl = (url) => {
   if (!url) return '';
@@ -19,12 +19,12 @@ const CallMessageCard = ({ message, isMe }) => {
   return (
     <div className="flex items-center gap-3 py-1">
       <div
-        className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
           isMissed || isDeclined
-            ? 'bg-rose-500/20 text-rose-500'
+            ? 'bg-rose-500/20 text-rose-400'
             : isMe
             ? 'bg-white/20 text-white'
-            : 'bg-primary/20 text-primary'
+            : 'bg-emerald-500/20 text-emerald-400'
         }`}
       >
         {isMissed ? (
@@ -39,12 +39,8 @@ const CallMessageCard = ({ message, isMe }) => {
       </div>
       <div>
         <p className="text-sm font-medium leading-tight">{message.content}</p>
-        <span
-          className={`text-[11px] ${
-            isMe ? 'text-green-100' : 'text-gray-500'
-          }`}
-        >
-          {isMissed ? 'No answer' : isDeclined ? 'Declined' : 'Call ended'}
+        <span className={`text-[11px] ${isMe ? 'text-emerald-100/70' : 'text-slate-400'}`}>
+          {isMissed ? 'Missed call' : isDeclined ? 'Declined' : 'Call ended'}
         </span>
       </div>
     </div>
@@ -52,26 +48,35 @@ const CallMessageCard = ({ message, isMe }) => {
 };
 
 const MessageList = forwardRef(({ loading }, ref) => {
-  const { messages } = useContext(ChatContext);
+  const { messages, currentChat } = useContext(ChatContext);
   const { user } = useContext(AuthContext);
-  const { typingUsers } = useContext(ChatContext);
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <p className="text-gray-400">Loading messages...</p>
+      <div className="flex-1 flex flex-col items-center justify-center p-6 text-slate-400">
+        <div className="w-6 h-6 border-2 border-emerald-500/30 border-t-emerald-400 rounded-full animate-spin mb-2" />
+        <p className="text-xs">Loading message history...</p>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4 messages-list">
+    <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3.5 messages-list">
       {messages.length === 0 ? (
-        <div className="flex items-center justify-center h-full">
-          <p className="text-gray-400">No messages yet. Start the conversation!</p>
+        <div className="flex flex-col items-center justify-center h-full text-center p-8 text-slate-400 animate-fade-in">
+          <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-3 text-2xl">
+            👋
+          </div>
+          <h4 className="text-base font-semibold text-white mb-1">
+            Say hello to {currentChat?.otherUser?.username}!
+          </h4>
+          <p className="text-xs text-slate-400 max-w-xs">
+            Start the conversation with a message, voice note, or high-definition call.
+          </p>
         </div>
       ) : (
         messages.map((message) => {
+          const isMe = message.senderId === user?.id;
           const isCall =
             message.fileType === 'call_ended' ||
             message.fileType === 'call_missed' ||
@@ -80,17 +85,17 @@ const MessageList = forwardRef(({ loading }, ref) => {
           return (
             <div
               key={message.id}
-              className={`flex ${message.senderId === user.id ? 'justify-end' : 'justify-start'}`}
+              className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} animate-fade-in`}
             >
               <div
-                className={`max-w-[85%] sm:max-w-md px-3 md:px-4 py-2 rounded-xl shadow-sm ${
-                  message.senderId === user.id
-                    ? 'bg-primary text-white'
-                    : 'bg-gray-200 text-gray-800'
+                className={`relative max-w-[85%] sm:max-w-md px-4 py-2.5 shadow-md ${
+                  isMe
+                    ? 'bg-emerald-600 text-white rounded-2xl rounded-br-xs shadow-emerald-950/20'
+                    : 'bg-[#1E293B] text-slate-100 rounded-2xl rounded-bl-xs border border-white/5'
                 }`}
               >
                 {isCall ? (
-                  <CallMessageCard message={message} isMe={message.senderId === user.id} />
+                  <CallMessageCard message={message} isMe={isMe} />
                 ) : message.fileType === 'audio' ? (
                   <VoiceMessage fileUrl={message.fileUrl} />
                 ) : message.fileUrl ? (
@@ -98,20 +103,34 @@ const MessageList = forwardRef(({ loading }, ref) => {
                     href={getFullUrl(message.fileUrl)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-400 hover:underline block"
+                    className="flex items-center gap-2 text-cyan-300 hover:text-cyan-200 hover:underline py-1 text-sm font-medium"
                   >
-                    📎 {message.fileName || 'Download file'}
+                    <Paperclip className="w-4 h-4 shrink-0" />
+                    <span className="truncate">{message.fileName || 'Download attachment'}</span>
                   </a>
                 ) : (
-                  <p className="break-words text-sm">{message.content}</p>
+                  <p className="break-words text-sm sm:text-base leading-relaxed">{message.content}</p>
                 )}
+
+                {/* Message Timestamp and Read Receipt */}
                 <div
-                  className={`text-xs mt-1 flex items-center justify-end gap-1 ${
-                    message.senderId === user.id ? 'text-green-100' : 'text-gray-500'
+                  className={`text-[10px] mt-1 flex items-center justify-end gap-1 font-medium select-none ${
+                    isMe ? 'text-emerald-100/70' : 'text-slate-400'
                   }`}
                 >
-                  {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  {message.senderId === user.id && message.isRead && ' ✓✓'}
+                  <span>
+                    {new Date(message.createdAt).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                  {isMe && (
+                    message.isRead ? (
+                      <CheckCheck className="w-3.5 h-3.5 text-cyan-200" title="Read" />
+                    ) : (
+                      <Check className="w-3.5 h-3.5 text-emerald-200/80" title="Sent" />
+                    )
+                  )}
                 </div>
               </div>
             </div>
