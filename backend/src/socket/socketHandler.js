@@ -192,18 +192,36 @@ export const initializeSocket = (io) => {
           return;
         }
 
-        // Check if caller or recipient is busy
+        // Check if caller or recipient is busy in an actual active call
         if (userCallMap.has(callerId)) {
-          socket.emit('call:error', { message: 'You are already in an active call' });
-          return;
+          const prevCallId = userCallMap.get(callerId);
+          const prevCall = activeCalls.get(prevCallId);
+          if (prevCall && prevCall.status === 'active') {
+            socket.emit('call:error', { message: 'You are already in an active call' });
+            return;
+          } else {
+            // Clean up stale or ringing call session
+            if (prevCall?.timeout) clearTimeout(prevCall.timeout);
+            activeCalls.delete(prevCallId);
+            userCallMap.delete(callerId);
+          }
         }
 
         if (userCallMap.has(targetUserId)) {
-          socket.emit('call:busy', {
-            toUserId: targetUserId,
-            reason: 'User is on another call'
-          });
-          return;
+          const prevCallId = userCallMap.get(targetUserId);
+          const prevCall = activeCalls.get(prevCallId);
+          if (prevCall && prevCall.status === 'active') {
+            socket.emit('call:busy', {
+              toUserId: targetUserId,
+              reason: 'User is on another call'
+            });
+            return;
+          } else {
+            // Clean up stale or ringing call session
+            if (prevCall?.timeout) clearTimeout(prevCall.timeout);
+            activeCalls.delete(prevCallId);
+            userCallMap.delete(targetUserId);
+          }
         }
 
         const caller = await User.findByPk(callerId, {
@@ -223,8 +241,31 @@ export const initializeSocket = (io) => {
           chatId,
           startTime: null,
           status: 'ringing',
-          caller: callerData
+          caller: callerData,
+          callerSocketId: socket.id,
+          createdAt: Date.now(),
         };
+
+        // Ringing timeout (45s) to auto-clean unanswered calls
+        const ringingTimeout = setTimeout(() => {
+          const c = activeCalls.get(callId);
+          if (c && c.status === 'ringing') {
+            console.log(`[call:timeout] Call ${callId} timed out`);
+            io.to(`user:${targetUserId}`).to(`user:${String(targetUserId)}`).emit('call:ended', {
+              callId,
+              reason: 'Missed call'
+            });
+            socket.emit('call:ended', {
+              callId,
+              reason: 'No answer'
+            });
+            userCallMap.delete(callerId);
+            userCallMap.delete(targetUserId);
+            activeCalls.delete(callId);
+          }
+        }, 45000);
+
+        callData.timeout = ringingTimeout;
 
         activeCalls.set(callId, callData);
         userCallMap.set(callerId, callId);
@@ -264,6 +305,12 @@ export const initializeSocket = (io) => {
           return;
         }
 
+        if (call.timeout) {
+          clearTimeout(call.timeout);
+          call.timeout = null;
+        }
+
+        call.calleeSocketId = socket.id;
         call.status = 'active';
         call.startTime = Date.now();
 
@@ -301,6 +348,10 @@ export const initializeSocket = (io) => {
         const call = activeCalls.get(callId);
 
         if (call) {
+          if (call.timeout) {
+            clearTimeout(call.timeout);
+            call.timeout = null;
+          }
           console.log(`[call:reject] Call ${callId} rejected: ${reason}`);
           io.to(`user:${call.callerId}`).to(`user:${String(call.callerId)}`).emit('call:rejected', {
             callId,
@@ -384,6 +435,10 @@ export const initializeSocket = (io) => {
         const call = activeCalls.get(callId);
 
         if (call) {
+          if (call.timeout) {
+            clearTimeout(call.timeout);
+            call.timeout = null;
+          }
           const currentUserId = Number(socket.userId);
           const otherUserId = currentUserId === call.callerId ? call.calleeId : call.callerId;
 
@@ -465,21 +520,25 @@ export const initializeSocket = (io) => {
         const userId = socket.userId ? Number(socket.userId) : null;
 
         if (userId) {
-          // If user was in an active call, terminate it cleanly
+          // Only terminate call if THIS socket was the active caller or callee
           if (userCallMap.has(userId)) {
             const callId = userCallMap.get(userId);
             const call = activeCalls.get(callId);
 
             if (call) {
-              const otherUserId = userId === call.callerId ? call.calleeId : call.callerId;
-              io.to(`user:${otherUserId}`).to(`user:${String(otherUserId)}`).emit('call:ended', {
-                callId,
-                reason: 'User disconnected'
-              });
+              const isCallSocket = !call.callerSocketId || call.callerSocketId === socket.id || call.calleeSocketId === socket.id;
+              if (isCallSocket) {
+                if (call.timeout) clearTimeout(call.timeout);
+                const otherUserId = userId === call.callerId ? call.calleeId : call.callerId;
+                io.to(`user:${otherUserId}`).to(`user:${String(otherUserId)}`).emit('call:ended', {
+                  callId,
+                  reason: 'User disconnected'
+                });
 
-              userCallMap.delete(call.callerId);
-              userCallMap.delete(call.calleeId);
-              activeCalls.delete(callId);
+                userCallMap.delete(call.callerId);
+                userCallMap.delete(call.calleeId);
+                activeCalls.delete(callId);
+              }
             }
           }
 

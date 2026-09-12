@@ -5,6 +5,7 @@ import { ChatProvider } from './context/ChatContext';
 import { CallProvider } from './context/CallContext';
 import IncomingCallModal from './components/IncomingCallModal';
 import CallModal from './components/CallModal';
+import CallErrorBanner from './components/CallErrorBanner';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Home from './pages/Home';
@@ -16,6 +17,7 @@ function App() {
       <AuthProvider>
         <ChatProvider>
           <CallProvider>
+            <CallErrorBanner />
             <IncomingCallModal />
             <CallModal />
             <Routes>

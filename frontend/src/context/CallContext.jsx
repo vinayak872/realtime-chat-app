@@ -195,6 +195,7 @@ export const CallProvider = ({ children }) => {
       }
 
       localStreamRef.current = stream;
+      setLocalStream(stream);
       playOutgoingDialTone();
 
       // Emit initiate event with normalized target ID
@@ -209,7 +210,13 @@ export const CallProvider = ({ children }) => {
       stopAllCallSounds();
       stopMediaTracks();
       setCallStatus('idle');
-      setCallError(err.name === 'NotAllowedError' ? 'Microphone/Camera permission denied' : 'Could not access media devices');
+      const errorMsg =
+        err.name === 'NotAllowedError'
+          ? 'Microphone/Camera permission denied. Please allow microphone permissions in your browser.'
+          : err.name === 'NotFoundError'
+          ? 'No microphone found on this device.'
+          : (err.message || 'Could not access microphone/camera');
+      setCallError(errorMsg);
     }
   }, [user, stopMediaTracks]);
 
@@ -613,6 +620,7 @@ export const CallProvider = ({ children }) => {
         isSpeakerMuted,
         callDuration,
         callError,
+        clearCallError: () => setCallError(null),
         remoteMediaState,
         startCall,
         acceptCall,

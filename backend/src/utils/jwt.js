@@ -9,8 +9,12 @@ export const generateToken = (userId) => {
   });
 };
 
-export const verifyToken = (token) => {
+export const verifyToken = (rawToken) => {
   try {
+    if (!rawToken) return null;
+    const token = typeof rawToken === 'string' && rawToken.startsWith('Bearer ')
+      ? rawToken.slice(7).trim()
+      : rawToken;
     return jwt.verify(token, process.env.JWT_SECRET);
   } catch (error) {
     return null;
