@@ -27,6 +27,7 @@ const CallModal = () => {
     callee,
     localStream,
     remoteStream,
+    screenStream,
     isMuted,
     isVideoOff,
     isScreenSharing,
@@ -47,22 +48,30 @@ const CallModal = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef(null);
 
-  // Attach local stream to local video element
+  // Attach local or screen stream to local video element
   useEffect(() => {
-    if (localVideoRef.current && localStream) {
-      localVideoRef.current.srcObject = localStream;
+    if (localVideoRef.current) {
+      if (isScreenSharing && screenStream) {
+        localVideoRef.current.srcObject = screenStream;
+        localVideoRef.current.play().catch(() => {});
+      } else if (localStream) {
+        localVideoRef.current.srcObject = localStream;
+        localVideoRef.current.play().catch(() => {});
+      }
     }
-  }, [localStream, callType]);
+  }, [localStream, screenStream, isScreenSharing, callType]);
 
   // Attach remote stream to remote video & audio elements
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
       remoteVideoRef.current.srcObject = remoteStream;
+      remoteVideoRef.current.play().catch(() => {});
     }
     if (remoteAudioRef.current && remoteStream) {
       remoteAudioRef.current.srcObject = remoteStream;
+      remoteAudioRef.current.play().catch(() => {});
     }
-  }, [remoteStream, callType]);
+  }, [remoteStream, callType, remoteMediaState]);
 
   // Toggle Fullscreen
   const handleToggleFullscreen = () => {
@@ -80,12 +89,13 @@ const CallModal = () => {
     return null;
   }
 
-  const isVideo = callType === 'video';
+  const isRemoteScreenSharing = Boolean(remoteMediaState?.screen);
+  const isVideo = callType === 'video' || isScreenSharing || isRemoteScreenSharing;
   const peer = callee?.username ? callee : caller;
   const isPeerVideoActive = Boolean(
     remoteStream &&
     remoteStream.getVideoTracks().length > 0 &&
-    remoteMediaState.video
+    (remoteMediaState?.video || isRemoteScreenSharing)
   );
 
   return (
@@ -93,13 +103,13 @@ const CallModal = () => {
       ref={containerRef}
       className="fixed inset-0 z-[9990] flex flex-col bg-slate-950 text-white select-none overflow-hidden"
     >
-      {/* Hidden audio element for remote audio stream playback */}
+      {/* Remote audio stream playback (accessible to browser autoplay without display:none) */}
       <audio
         ref={remoteAudioRef}
         autoPlay
         playsInline
         muted={isSpeakerMuted}
-        style={{ display: 'none' }}
+        className="sr-only fixed -top-[9999px] left-0 pointer-events-none opacity-0"
       />
 
       {/* Top Header Bar */}
@@ -160,16 +170,44 @@ const CallModal = () => {
       {/* Main Content Area */}
       <div className="relative flex-1 w-full h-full flex items-center justify-center overflow-hidden">
         {isVideo ? (
-          /* Video Call View */
+          /* Video / Screen Presentation Stage */
           <div className="relative w-full h-full flex items-center justify-center bg-black">
-            {/* Remote Video Stream */}
+            {/* Remote Screen Share Active Banner */}
+            {isRemoteScreenSharing && (
+              <div className="absolute top-20 z-30 flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/90 border border-emerald-500/40 text-emerald-300 text-xs sm:text-sm font-medium shadow-xl backdrop-blur-md animate-fade-in">
+                <MonitorUp className="w-4 h-4 text-emerald-400 animate-pulse" />
+                <span>{peer?.username || 'Peer'} is sharing their screen</span>
+              </div>
+            )}
+
+            {/* Remote Video Stream (or Peer Screen) */}
             {isPeerVideoActive ? (
               <video
                 ref={remoteVideoRef}
                 autoPlay
                 playsInline
-                className="w-full h-full object-cover md:object-contain"
+                className={`w-full h-full ${
+                  isRemoteScreenSharing ? 'object-contain bg-black' : 'object-cover md:object-contain'
+                }`}
               />
+            ) : isScreenSharing ? (
+              /* Local User is presenting, remote video is off */
+              <div className="flex flex-col items-center justify-center gap-4 text-center p-6 max-w-md">
+                <div className="w-20 h-20 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-xl mb-2">
+                  <MonitorUp className="w-10 h-10 animate-bounce" />
+                </div>
+                <h3 className="text-2xl font-bold text-white">You are sharing your screen</h3>
+                <p className="text-sm text-gray-400">
+                  {peer?.username || 'The other person'} can see your screen right now
+                </p>
+                <button
+                  onClick={toggleScreenShare}
+                  className="mt-2 px-6 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold shadow-lg shadow-rose-600/30 transition transform hover:scale-105 flex items-center gap-2"
+                >
+                  <MonitorUp className="w-4 h-4 rotate-180" />
+                  Stop Sharing
+                </button>
+              </div>
             ) : (
               /* Remote Video Off / Calling Placeholder */
               <div className="flex flex-col items-center justify-center gap-4 text-center p-6">
@@ -200,9 +238,26 @@ const CallModal = () => {
               </div>
             )}
 
-            {/* Local Video Thumbnail (PIP) */}
-            <div className="absolute bottom-28 right-6 z-20 w-36 h-48 sm:w-48 sm:h-64 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 bg-gray-900 transition-all duration-300">
-              {isVideoOff ? (
+            {/* Local Video / Screen Thumbnail (PIP) */}
+            <div
+              className={`absolute bottom-28 right-4 sm:right-6 z-20 overflow-hidden shadow-2xl border-2 border-white/20 bg-gray-900 transition-all duration-300 rounded-2xl ${
+                isScreenSharing ? 'w-44 h-28 sm:w-56 sm:h-36' : 'w-32 h-44 sm:w-44 sm:h-60'
+              }`}
+            >
+              {isScreenSharing ? (
+                <div className="relative w-full h-full bg-black flex items-center justify-center">
+                  <video
+                    ref={localVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-contain"
+                  />
+                  <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-emerald-600/90 text-[10px] font-semibold text-white uppercase tracking-wider shadow">
+                    Your Screen
+                  </div>
+                </div>
+              ) : isVideoOff ? (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-gray-900 text-gray-400 p-2 text-center">
                   <VideoOff className="w-6 h-6 mb-1 text-gray-500" />
                   <span className="text-[11px]">Camera off</span>
@@ -213,7 +268,7 @@ const CallModal = () => {
                   autoPlay
                   playsInline
                   muted
-                  className={`w-full h-full object-cover ${isScreenSharing ? '' : '-scale-x-100'}`}
+                  className="w-full h-full object-cover -scale-x-100"
                 />
               )}
               {isMuted && (
@@ -301,13 +356,13 @@ const CallModal = () => {
             {isVideoOff ? <VideoOff className="w-5 h-5 sm:w-6 sm:h-6" /> : <Video className="w-5 h-5 sm:w-6 sm:h-6" />}
           </button>
 
-          {/* Screen Share (Desktop only) */}
-          {navigator.mediaDevices?.getDisplayMedia && (
+          {/* Screen Share (Desktop browsers supporting getDisplayMedia) */}
+          {Boolean(typeof navigator !== 'undefined' && navigator.mediaDevices?.getDisplayMedia) && (
             <button
               onClick={toggleScreenShare}
               className={`p-3.5 sm:p-4 rounded-full transition-all duration-200 transform hover:scale-105 ${
                 isScreenSharing
-                  ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
+                  ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/40 ring-2 ring-emerald-300'
                   : 'bg-white/10 hover:bg-white/20 text-white'
               }`}
               title={isScreenSharing ? 'Stop Screen Share' : 'Share Screen'}
