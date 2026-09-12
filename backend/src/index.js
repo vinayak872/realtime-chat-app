@@ -44,6 +44,15 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ message: 'Server is running' });
 });
 
+// Version & Features check
+app.get('/api/version', (req, res) => {
+  res.status(200).json({
+    version: '1.2.0',
+    features: ['calling', 'webrtc', 'voice', 'video', 'call_signaling'],
+    status: 'ready'
+  });
+});
+
 // Socket.IO initialization
 initializeSocket(io);
 
