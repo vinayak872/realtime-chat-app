@@ -5,6 +5,9 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 let socket;
 
 export const initializeSocket = (token) => {
+  if (socket && socket.connected) {
+    return socket;
+  }
   if (socket) {
     socket.disconnect();
   }
@@ -41,4 +44,20 @@ export const socketEvents = {
   typingStart: 'typing:start',
   typingStop: 'typing:stop',
   typingIndicator: 'typing:indicator',
+  // Call events
+  callInitiate: 'call:initiate',
+  callIncoming: 'call:incoming',
+  callRinging: 'call:ringing',
+  callAccept: 'call:accept',
+  callAccepted: 'call:accepted',
+  callStarted: 'call:started',
+  callReject: 'call:reject',
+  callRejected: 'call:rejected',
+  callSignal: 'call:signal',
+  callMediaState: 'call:media-state',
+  callEnd: 'call:end',
+  callEnded: 'call:ended',
+  callBusy: 'call:busy',
+  callUnavailable: 'call:unavailable',
+  callError: 'call:error',
 };

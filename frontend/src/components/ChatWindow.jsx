@@ -1,14 +1,17 @@
 import React, { useContext, useEffect, useState, useRef } from 'react';
 import { ChatContext } from '../context/ChatContext';
 import { AuthContext } from '../context/AuthContext';
+import { CallContext } from '../context/CallContext';
 import { chatService, messageService } from '../services/api';
 import { getSocket, socketEvents } from '../services/socket';
+import { Phone, Video } from 'lucide-react';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 
 const ChatWindow = () => {
   const { currentChat, setCurrentChat, messages, setMessages, addMessage, markMessageAsRead, setUnreadCounts } = useContext(ChatContext);
   const { user } = useContext(AuthContext);
+  const { startCall, callStatus } = useContext(CallContext);
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
@@ -66,10 +69,30 @@ const ChatWindow = () => {
     return null;
   }
 
+  const handleStartAudioCall = () => {
+    if (!currentChat?.otherUser) return;
+    startCall({
+      targetUser: currentChat.otherUser,
+      callType: 'audio',
+      chatId: currentChat.id,
+    });
+  };
+
+  const handleStartVideoCall = () => {
+    if (!currentChat?.otherUser) return;
+    startCall({
+      targetUser: currentChat.otherUser,
+      callType: 'video',
+      chatId: currentChat.id,
+    });
+  };
+
+  const isCallDisabled = callStatus !== 'idle';
+
   return (
     <div className="flex-1 flex flex-col bg-white h-full w-full max-w-full overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 bg-white flex items-center justify-between">
+      <div className="p-4 border-b border-gray-200 bg-white flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setCurrentChat(null)}
@@ -80,15 +103,48 @@ const ChatWindow = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
           </button>
-          <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-semibold">
+          <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-semibold shadow-inner">
             {currentChat.otherUser.username.charAt(0).toUpperCase()}
           </div>
           <div>
-            <p className="font-semibold">{currentChat.otherUser.username}</p>
+            <p className="font-semibold text-gray-900 leading-tight">{currentChat.otherUser.username}</p>
             <p className="text-xs text-gray-500">
-              {currentChat.otherUser.status === 'online' ? '🟢 Online' : `Last seen at ${new Date(currentChat.otherUser.lastSeen).toLocaleTimeString()}`}
+              {currentChat.otherUser.status === 'online' ? (
+                <span className="text-emerald-600 font-medium">● Online</span>
+              ) : (
+                `Last seen at ${new Date(currentChat.otherUser.lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+              )}
             </p>
           </div>
+        </div>
+
+        {/* Call Action Buttons */}
+        <div className="flex items-center gap-1 sm:gap-2">
+          <button
+            onClick={handleStartAudioCall}
+            disabled={isCallDisabled}
+            className={`p-2.5 rounded-full transition duration-150 flex items-center justify-center ${
+              isCallDisabled
+                ? 'text-gray-300 cursor-not-allowed'
+                : 'text-primary hover:bg-primary/10 hover:text-primary active:scale-95'
+            }`}
+            title="Start voice call"
+          >
+            <Phone className="w-5 h-5" />
+          </button>
+
+          <button
+            onClick={handleStartVideoCall}
+            disabled={isCallDisabled}
+            className={`p-2.5 rounded-full transition duration-150 flex items-center justify-center ${
+              isCallDisabled
+                ? 'text-gray-300 cursor-not-allowed'
+                : 'text-primary hover:bg-primary/10 hover:text-primary active:scale-95'
+            }`}
+            title="Start video call"
+          >
+            <Video className="w-5 h-5" />
+          </button>
         </div>
       </div>
 
