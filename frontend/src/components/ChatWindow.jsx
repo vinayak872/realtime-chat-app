@@ -98,7 +98,7 @@ const ChatWindow = () => {
           {/* Mobile Back to Chats Button */}
           <button
             onClick={() => setCurrentChat(null)}
-            className="md:hidden p-2 -ml-1 text-slate-300 hover:text-white active:scale-95 rounded-xl hover:bg-white/10 transition"
+            className="lg:hidden p-2 -ml-1 text-slate-300 hover:text-white active:scale-95 rounded-xl hover:bg-white/10 transition"
             title="Back to chats"
           >
             <ChevronLeft className="w-6 h-6" />

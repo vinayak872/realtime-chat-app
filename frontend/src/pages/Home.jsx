@@ -51,8 +51,8 @@ const Home = () => {
       {/* Chat List Sidebar (Visible on mobile if no currentChat, always visible on desktop) */}
       <div
         className={`${
-          currentChat ? 'hidden md:flex' : 'flex'
-        } w-full md:w-[380px] lg:w-[420px] shrink-0 h-full border-r border-white/10 flex-col bg-[#0F172A]/95 backdrop-blur-xl z-10 transition-all duration-300`}
+          currentChat ? 'hidden lg:flex' : 'flex'
+        } w-full lg:w-[380px] xl:w-[420px] shrink-0 h-full border-r border-white/10 flex-col bg-[#0F172A]/95 backdrop-blur-xl z-10 transition-all duration-300`}
       >
         <ChatList />
       </div>
@@ -60,14 +60,14 @@ const Home = () => {
       {/* Main Chat Area or Desktop Welcome State */}
       <div
         className={`${
-          currentChat ? 'flex' : 'hidden md:flex'
+          currentChat ? 'flex' : 'hidden lg:flex'
         } flex-1 h-full w-full flex-col bg-[#0B0F19] relative overflow-hidden`}
       >
         {currentChat ? (
           <ChatWindow />
         ) : (
           /* Desktop Empty State Screen */
-          <div className="hidden md:flex flex-1 flex-col items-center justify-center p-8 text-center relative overflow-hidden bg-gradient-to-b from-[#0F172A]/40 to-[#0B0F19]">
+          <div className="hidden lg:flex flex-1 flex-col items-center justify-center p-8 text-center relative overflow-hidden bg-gradient-to-b from-[#0F172A]/40 to-[#0B0F19]">
             {/* Ambient Lighting */}
             <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-emerald-500/10 rounded-full blur-[100px] pointer-events-none" />
             <div className="absolute bottom-1/4 right-1/4 w-72 h-72 bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none" />
