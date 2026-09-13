@@ -45,7 +45,7 @@ export const initializeSocket = (io) => {
     // Send message event
     socket.on('message:send', async (data) => {
       try {
-        const { chatId, content, fileUrl, fileType, fileName } = data;
+        const { chatId, content, fileUrl, fileType, fileName, replyTo } = data;
         const userId = Number(socket.userId);
 
         if (!chatId || (!content && !fileUrl)) {
@@ -59,6 +59,10 @@ export const initializeSocket = (io) => {
           fileUrl: fileUrl || null,
           fileType: fileType || null,
           fileName: fileName || null,
+          replyTo: replyTo ? (typeof replyTo === 'object' ? JSON.stringify(replyTo) : replyTo) : null,
+          reactions: '[]',
+          isDeleted: false,
+          isEdited: false,
         });
 
         const chat = await Chat.findByPk(chatId);
@@ -72,6 +76,10 @@ export const initializeSocket = (io) => {
           fileUrl: message.fileUrl,
           fileType: message.fileType,
           fileName: message.fileName,
+          replyTo: message.replyTo,
+          reactions: message.reactions,
+          isDeleted: message.isDeleted,
+          isEdited: message.isEdited,
           createdAt: message.createdAt,
           isRead: false,
         };
@@ -86,6 +94,113 @@ export const initializeSocket = (io) => {
         });
       } catch (error) {
         console.error('Error in message:send:', error);
+      }
+    });
+
+    // Message reaction toggle
+    socket.on('message:reaction', async (data) => {
+      try {
+        const { messageId, chatId, emoji } = data;
+        const userId = Number(socket.userId);
+        const user = await User.findByPk(userId);
+        const username = user?.username || `User ${userId}`;
+
+        const message = await Message.findByPk(messageId);
+        if (!message) return;
+
+        let reactions = [];
+        try {
+          reactions = message.reactions ? JSON.parse(message.reactions) : [];
+        } catch (e) {
+          reactions = [];
+        }
+
+        const existingIndex = reactions.findIndex(r => r.userId === userId && r.emoji === emoji);
+        if (existingIndex > -1) {
+          reactions.splice(existingIndex, 1);
+        } else {
+          reactions.push({ emoji, userId, username });
+        }
+
+        message.reactions = JSON.stringify(reactions);
+        await message.save();
+
+        const chat = await Chat.findByPk(chatId);
+        if (!chat) return;
+
+        const payload = {
+          messageId,
+          chatId,
+          reactions: message.reactions,
+        };
+
+        io.to(`user:${chat.user1Id}`).to(`user:${String(chat.user1Id)}`).emit('message:reaction-updated', payload);
+        io.to(`user:${chat.user2Id}`).to(`user:${String(chat.user2Id)}`).emit('message:reaction-updated', payload);
+      } catch (error) {
+        console.error('Error in message:reaction:', error);
+      }
+    });
+
+    // Message edit
+    socket.on('message:edit', async (data) => {
+      try {
+        const { messageId, chatId, content } = data;
+        const userId = Number(socket.userId);
+
+        const message = await Message.findByPk(messageId);
+        if (!message || message.senderId !== userId || message.isDeleted) return;
+
+        message.content = content;
+        message.isEdited = true;
+        await message.save();
+
+        const chat = await Chat.findByPk(chatId);
+        if (!chat) return;
+
+        const payload = {
+          messageId,
+          chatId,
+          content: message.content,
+          isEdited: true,
+        };
+
+        io.to(`user:${chat.user1Id}`).to(`user:${String(chat.user1Id)}`).emit('message:edited', payload);
+        io.to(`user:${chat.user2Id}`).to(`user:${String(chat.user2Id)}`).emit('message:edited', payload);
+      } catch (error) {
+        console.error('Error in message:edit:', error);
+      }
+    });
+
+    // Message delete ("Delete for everyone")
+    socket.on('message:delete', async (data) => {
+      try {
+        const { messageId, chatId } = data;
+        const userId = Number(socket.userId);
+
+        const message = await Message.findByPk(messageId);
+        if (!message || message.senderId !== userId) return;
+
+        message.isDeleted = true;
+        message.content = '🚫 This message was deleted';
+        message.fileUrl = null;
+        message.fileType = null;
+        message.fileName = null;
+        await message.save();
+
+        const chat = await Chat.findByPk(chatId);
+        if (!chat) return;
+
+        const payload = {
+          messageId,
+          chatId,
+          isDeleted: true,
+          content: message.content,
+        };
+
+        io.to(`user:${chat.user1Id}`).to(`user:${String(chat.user1Id)}`).emit('message:deleted', payload);
+        io.to(`user:${chat.user2Id}`).to(`user:${String(chat.user2Id)}`).emit('message:deleted', payload);
+      } catch (error) {
+        console.error('Error in message:delete:', error);
       }
     });
 

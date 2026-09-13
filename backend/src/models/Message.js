@@ -49,6 +49,23 @@ const Message = sequelize.define(
       type: DataTypes.DATE,
       allowNull: true,
     },
+    reactions: {
+      type: DataTypes.TEXT,
+      defaultValue: '[]',
+      allowNull: true,
+    },
+    replyTo: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    isDeleted: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+    isEdited: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
     createdAt: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,

@@ -11,6 +11,7 @@ import errorHandler from './middlewares/errorHandler.js';
 import authRoutes from './routes/authRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 import messageRoutes from './routes/messageRoutes.js';
+import { migrateDatabase } from './utils/migrateDb.js';
 
 dotenv.config();
 
@@ -74,6 +75,8 @@ const startServer = async () => {
 
     await sequelize.sync({ alter: false });
     console.log('Database models synchronized');
+
+    await migrateDatabase();
 
     httpServer.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);

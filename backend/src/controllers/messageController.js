@@ -3,7 +3,7 @@ import { Op, fn, col } from 'sequelize';
 
 export const sendMessage = async (req, res, next) => {
   try {
-    const { chatId, content, fileUrl, fileType, fileName } = req.body;
+    const { chatId, content, fileUrl, fileType, fileName, replyTo } = req.body;
     const senderId = req.user.userId;
 
     if (!chatId || (!content && !fileUrl)) {
@@ -17,6 +17,10 @@ export const sendMessage = async (req, res, next) => {
       fileUrl: fileUrl || null,
       fileType: fileType || null,
       fileName: fileName || null,
+      replyTo: replyTo ? (typeof replyTo === 'object' ? JSON.stringify(replyTo) : replyTo) : null,
+      reactions: '[]',
+      isDeleted: false,
+      isEdited: false,
     });
 
     res.status(201).json({

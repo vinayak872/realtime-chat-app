@@ -11,6 +11,7 @@ import {
   Minimize2,
   Volume2,
   VolumeX,
+  ChevronDown,
 } from 'lucide-react';
 
 const formatDuration = (totalSeconds) => {
@@ -46,7 +47,14 @@ const CallModal = () => {
   const remoteVideoRef = useRef(null);
   const remoteAudioRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
   const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (callStatus === 'idle') {
+      setIsMinimized(false);
+    }
+  }, [callStatus]);
 
   // Attach local or screen stream to local video element
   useEffect(() => {
@@ -97,6 +105,106 @@ const CallModal = () => {
     remoteStream.getVideoTracks().length > 0 &&
     (remoteMediaState?.video || isRemoteScreenSharing)
   );
+
+  if (isMinimized) {
+    return (
+      <div className="fixed bottom-5 right-5 z-[9990] w-72 sm:w-80 bg-slate-900/95 border border-white/20 rounded-3xl shadow-2xl p-3.5 backdrop-blur-2xl text-white animate-scale-in flex flex-col gap-3 select-none">
+        <audio
+          ref={remoteAudioRef}
+          autoPlay
+          playsInline
+          muted={isSpeakerMuted}
+          className="sr-only fixed -top-[9999px] left-0 pointer-events-none opacity-0"
+        />
+
+        {/* Mini Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-500 to-cyan-500 text-white font-bold text-xs flex items-center justify-center shrink-0">
+              {peer?.profilePic ? (
+                <img src={peer.profilePic} alt={peer.username} className="w-full h-full rounded-full object-cover" />
+              ) : (
+                peer?.username?.charAt(0).toUpperCase() || '?'
+              )}
+            </div>
+            <div className="min-w-0">
+              <h4 className="text-xs font-semibold text-white truncate">{peer?.username}</h4>
+              <p className="text-[10px] text-emerald-400">
+                {callStatus === 'calling' ? 'Calling...' : formatDuration(callDuration)}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setIsMinimized(false)}
+              className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition active:scale-95"
+              title="Expand call"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </button>
+            <button
+              onClick={endCall}
+              className="p-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white transition active:scale-95"
+              title="End call"
+            >
+              <PhoneOff className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Mini Video or Audio Status */}
+        {isVideo && isPeerVideoActive ? (
+          <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black border border-white/10">
+            <video
+              ref={remoteVideoRef}
+              autoPlay
+              playsInline
+              className="w-full h-full object-cover"
+            />
+          </div>
+        ) : (
+          <div className="py-2.5 px-3 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center gap-2 text-xs text-slate-300">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Voice call active</span>
+          </div>
+        )}
+
+        {/* Mini Quick Actions */}
+        <div className="flex items-center justify-around pt-1 border-t border-white/10">
+          <button
+            onClick={toggleMute}
+            className={`p-2 rounded-xl transition active:scale-95 ${
+              isMuted ? 'bg-rose-500 text-white' : 'bg-white/10 hover:bg-white/20 text-white'
+            }`}
+            title={isMuted ? 'Unmute' : 'Mute'}
+          >
+            {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+          </button>
+
+          <button
+            onClick={toggleVideo}
+            className={`p-2 rounded-xl transition active:scale-95 ${
+              isVideoOff ? 'bg-rose-500 text-white' : 'bg-white/10 hover:bg-white/20 text-white'
+            }`}
+            title={isVideoOff ? 'Turn video on' : 'Turn video off'}
+          >
+            {isVideoOff ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
+          </button>
+
+          <button
+            onClick={toggleSpeakerMuted}
+            className={`p-2 rounded-xl transition active:scale-95 ${
+              isSpeakerMuted ? 'bg-rose-500 text-white' : 'bg-white/10 hover:bg-white/20 text-white'
+            }`}
+            title={isSpeakerMuted ? 'Unmute speaker' : 'Mute speaker'}
+          >
+            {isSpeakerMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -156,6 +264,13 @@ const CallModal = () => {
             title={isSpeakerMuted ? 'Unmute Speaker' : 'Mute Speaker'}
           >
             {isSpeakerMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+          </button>
+          <button
+            onClick={() => setIsMinimized(true)}
+            className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md text-white transition active:scale-95"
+            title="Minimize Call (multitask)"
+          >
+            <ChevronDown className="w-5 h-5" />
           </button>
           <button
             onClick={handleToggleFullscreen}
