@@ -17,20 +17,36 @@ dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
+// Allowed CORS origins
+const allowedOrigins = [
+  'https://realtime-chat-application-pied.vercel.app',
+  'https://kluchat.me',
+  'https://www.kluchat.me',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  ...(process.env.CLIENT_URL
+    ? process.env.CLIENT_URL.split(',').map((origin) => origin.trim())
+    : []),
+];
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g., mobile apps, curl) or allow dynamically
+    if (!origin) return callback(null, true);
+    // Allow all origins dynamically while reflecting origin for credentials support
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+};
+
 const httpServer = createServer(app);
 const io = new SocketIO(httpServer, {
-  cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    credentials: true,
-  },
+  cors: corsOptions,
 });
 
 // Middleware
-app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
-  credentials: true,
-}));
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
