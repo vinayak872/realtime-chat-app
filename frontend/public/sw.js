@@ -1,5 +1,5 @@
-// Service Worker for Pulse Chat PWA
-const CACHE_NAME = 'pulse-chat-v1';
+// Service Worker for KLU Chat PWA
+const CACHE_NAME = 'kluchat-v1';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

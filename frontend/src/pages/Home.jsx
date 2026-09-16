@@ -80,7 +80,7 @@ const Home = () => {
               </div>
 
               <h2 className="text-2xl font-bold text-white mb-2 tracking-tight">
-                Pulse Web Messenger
+                KLU Chat Web Messenger
               </h2>
               <p className="text-sm text-slate-400 mb-8 leading-relaxed">
                 Connect instantly with friends and teammates. Send messages, share media, and make high-definition voice and video calls.

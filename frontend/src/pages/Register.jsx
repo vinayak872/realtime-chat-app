@@ -67,7 +67,7 @@ const Register = () => {
             Create Account
           </h1>
           <p className="text-sm text-slate-400">
-            Join Pulse for real-time messaging, voice & video calls
+            Join KLU Chat for real-time messaging, voice & video calls
           </p>
         </div>
 

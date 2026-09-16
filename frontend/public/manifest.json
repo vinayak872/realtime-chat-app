@@ -1,6 +1,6 @@
 {
-  "name": "Pulse Realtime Chat & Calls",
-  "short_name": "Pulse",
+  "name": "KLU Chat Realtime Chat & Calls",
+  "short_name": "KLU Chat",
   "description": "Realtime instant messaging, audio & video calling, and file sharing",
   "start_url": "/",
   "display": "standalone",
