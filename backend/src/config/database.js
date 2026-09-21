@@ -23,6 +23,25 @@ if (isDevelopment || process.env.DB_DIALECT === 'sqlite') {
     logging: process.env.NODE_ENV === 'development' ? console.log : false,
   });
   console.log(`📦 Using SQLite database at: ${dbPath}`);
+} else if (process.env.DATABASE_URL) {
+  // Production: Use PostgreSQL via DATABASE_URL
+  sequelize = new Sequelize(process.env.DATABASE_URL, {
+    dialect: 'postgres',
+    logging: process.env.NODE_ENV === 'development' ? console.log : false,
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false,
+      },
+    },
+    pool: {
+      max: 10,
+      min: 0,
+      acquire: 30000,
+      idle: 10000,
+    },
+  });
+  console.log(`📦 Using PostgreSQL database via DATABASE_URL`);
 } else {
   // Production: Use PostgreSQL
   sequelize = new Sequelize(
@@ -34,6 +53,12 @@ if (isDevelopment || process.env.DB_DIALECT === 'sqlite') {
       port: process.env.DB_PORT || 5432,
       dialect: 'postgres',
       logging: process.env.NODE_ENV === 'development' ? console.log : false,
+      dialectOptions: {
+        ssl: {
+          require: true,
+          rejectUnauthorized: false,
+        },
+      },
       pool: {
         max: 10,
         min: 0,
