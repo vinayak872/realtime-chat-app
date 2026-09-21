@@ -45,10 +45,27 @@ export const initializeSocket = (io) => {
     // Send message event
     socket.on('message:send', async (data) => {
       try {
-        const { chatId, content, fileUrl, fileType, fileName, replyTo } = data;
-        const userId = Number(socket.userId);
+        const { chatId, content, fileUrl, fileType, fileName, replyTo, token, authToken } = data;
+        let userId = Number(socket.userId);
+
+        // Defensive auth fallback: if socket.userId was lost on reconnect, decode token
+        if ((!userId || isNaN(userId)) && (token || authToken)) {
+          const decoded = verifyToken(token || authToken);
+          if (decoded?.userId) {
+            userId = Number(decoded.userId);
+            socket.userId = userId;
+            socket.join(`user:${userId}`);
+            socket.join(`user:${String(userId)}`);
+          }
+        }
 
         if (!chatId || (!content && !fileUrl)) {
+          return;
+        }
+
+        if (!userId || isNaN(userId)) {
+          console.warn('[Socket message:send] Rejected unauthenticated message attempt');
+          socket.emit('message:error', { chatId, error: 'User is not authenticated' });
           return;
         }
 
@@ -94,6 +111,10 @@ export const initializeSocket = (io) => {
         });
       } catch (error) {
         console.error('Error in message:send:', error);
+        socket.emit('message:error', {
+          chatId: data?.chatId,
+          error: error.message || 'Failed to send message',
+        });
       }
     });
 

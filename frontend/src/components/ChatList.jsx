@@ -34,7 +34,7 @@ const formatChatTime = (timestamp) => {
 
 const ChatList = () => {
   const { chats, setChats, currentChat, setCurrentChat, unreadCounts, setUnreadCounts } = useContext(ChatContext);
-  const { user, logout } = useContext(AuthContext);
+  const { user, token, logout } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -57,12 +57,12 @@ const ChatList = () => {
 
   // Listen for new messages to update the chat list sorting and unread counts
   useEffect(() => {
-    const socket = getSocket();
+    const socket = getSocket() || (token ? initializeSocket(token) : null);
     if (!socket) return;
 
     const handleNewMessage = (message) => {
       setChats((prevChats) => {
-        const chatIndex = prevChats.findIndex((c) => c.id === message.chatId);
+        const chatIndex = prevChats.findIndex((c) => Number(c.id) === Number(message.chatId));
         if (chatIndex > -1) {
           const updatedChat = { ...prevChats[chatIndex], lastMessage: message };
           const newChats = [...prevChats];
@@ -72,7 +72,7 @@ const ChatList = () => {
         return prevChats;
       });
 
-      if (currentChat?.id !== message.chatId) {
+      if (Number(currentChat?.id) !== Number(message.chatId)) {
         setUnreadCounts((prev) => ({
           ...prev,
           [message.chatId]: (prev[message.chatId] || 0) + 1,
@@ -84,7 +84,7 @@ const ChatList = () => {
     return () => {
       socket.off(socketEvents.messageNew, handleNewMessage);
     };
-  }, [currentChat?.id, setChats, setUnreadCounts]);
+  }, [currentChat?.id, token, setChats, setUnreadCounts]);
 
   const handleStartChat = async (user2Id) => {
     try {

@@ -14,6 +14,7 @@ const MessageInput = () => {
     editingMessage,
     setEditingMessage,
     soundEnabled,
+    addMessage,
   } = useContext(ChatContext);
   const [content, setContent] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -33,9 +34,11 @@ const MessageInput = () => {
   if (!currentChat) return null;
 
   const handleSendVoice = ({ fileUrl, fileType, fileName }) => {
+    const token = localStorage.getItem('token');
     const socket = getSocket();
     if (soundEnabled) playSentMessageSound();
-    socket?.emit(socketEvents.messageSend, {
+
+    const payload = {
       chatId: currentChat.id,
       content: null,
       fileUrl,
@@ -50,7 +53,23 @@ const MessageInput = () => {
             fileType: replyingTo.fileType,
           }
         : null,
-    });
+      token,
+    };
+
+    if (socket && socket.connected) {
+      socket.emit(socketEvents.messageSend, payload);
+    } else {
+      messageService
+        .sendMessage(payload)
+        .then((res) => {
+          if (res.data?.data) {
+            addMessage(res.data.data);
+          }
+        })
+        .catch((err) => {
+          console.error('Error sending voice message via fallback:', err);
+        });
+    }
     setReplyingTo(null);
   };
 
@@ -95,6 +114,7 @@ const MessageInput = () => {
     if ((!content.trim() && !file) || isUploading) return;
     handleTypingStop();
 
+    const token = localStorage.getItem('token');
     const socket = getSocket();
 
     // Check if submitting an edit
@@ -103,6 +123,7 @@ const MessageInput = () => {
         messageId: editingMessage.id,
         chatId: currentChat.id,
         content: content.trim(),
+        token,
       });
       setEditingMessage(null);
       setContent('');
@@ -112,7 +133,7 @@ const MessageInput = () => {
     // Normal message send
     if (soundEnabled) playSentMessageSound();
 
-    socket?.emit(socketEvents.messageSend, {
+    const payload = {
       chatId: currentChat.id,
       content: content.trim() || null,
       fileUrl: file?.fileUrl || null,
@@ -127,7 +148,25 @@ const MessageInput = () => {
             fileType: replyingTo.fileType,
           }
         : null,
-    });
+      token,
+    };
+
+    if (socket && socket.connected) {
+      socket.emit(socketEvents.messageSend, payload);
+    } else {
+      // Fallback to REST API if socket is disconnected
+      messageService
+        .sendMessage(payload)
+        .then((res) => {
+          if (res.data?.data) {
+            addMessage(res.data.data);
+          }
+        })
+        .catch((err) => {
+          console.error('Failed to send message via fallback:', err);
+          alert('Failed to send message. Please check your connection.');
+        });
+    }
 
     setContent('');
     setFile(null);

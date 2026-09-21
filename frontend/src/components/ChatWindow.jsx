@@ -40,7 +40,7 @@ const ChatWindow = () => {
     searchQuery,
     setSearchQuery,
   } = useContext(ChatContext);
-  const { user } = useContext(AuthContext);
+  const { user, token } = useContext(AuthContext);
   const { startCall, callStatus } = useContext(CallContext);
   const [loading, setLoading] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -82,15 +82,15 @@ const ChatWindow = () => {
 
   // Socket event subscriptions
   useEffect(() => {
-    const socket = getSocket();
+    const socket = getSocket() || (token ? initializeSocket(token) : null);
     if (!socket) return;
 
     const handleNewMessage = (message) => {
-      if (message.chatId === currentChat?.id) {
+      if (Number(message.chatId) === Number(currentChat?.id)) {
         addMessage(message);
 
         // Play chime & show notification if message from other user
-        if (message.senderId !== user?.id) {
+        if (Number(message.senderId) !== Number(user?.id)) {
           if (soundEnabled) {
             playIncomingMessageSound();
           }
@@ -107,26 +107,32 @@ const ChatWindow = () => {
     };
 
     const handleReadReceipt = (data) => {
-      if (data.chatId === currentChat?.id) {
+      if (Number(data.chatId) === Number(currentChat?.id)) {
         markMessageAsRead(data.messageId);
       }
     };
 
     const handleReactionUpdated = (data) => {
-      if (data.chatId === currentChat?.id) {
+      if (Number(data.chatId) === Number(currentChat?.id)) {
         updateMessageReactions(data.messageId, data.reactions);
       }
     };
 
     const handleMessageEdited = (data) => {
-      if (data.chatId === currentChat?.id) {
+      if (Number(data.chatId) === Number(currentChat?.id)) {
         updateMessageContent(data.messageId, data.content, true);
       }
     };
 
     const handleMessageDeleted = (data) => {
-      if (data.chatId === currentChat?.id) {
+      if (Number(data.chatId) === Number(currentChat?.id)) {
         deleteMessageById(data.messageId);
+      }
+    };
+
+    const handleMessageError = (data) => {
+      if (Number(data.chatId) === Number(currentChat?.id)) {
+        console.error('Socket message error:', data.error);
       }
     };
 
@@ -135,6 +141,7 @@ const ChatWindow = () => {
     socket.on(socketEvents.messageReactionUpdated, handleReactionUpdated);
     socket.on(socketEvents.messageEdited, handleMessageEdited);
     socket.on(socketEvents.messageDeleted, handleMessageDeleted);
+    socket.on('message:error', handleMessageError);
 
     return () => {
       socket.off(socketEvents.messageNew, handleNewMessage);
@@ -142,6 +149,7 @@ const ChatWindow = () => {
       socket.off(socketEvents.messageReactionUpdated, handleReactionUpdated);
       socket.off(socketEvents.messageEdited, handleMessageEdited);
       socket.off(socketEvents.messageDeleted, handleMessageDeleted);
+      socket.off('message:error', handleMessageError);
     };
   }, [
     currentChat?.id,

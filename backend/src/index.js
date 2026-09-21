@@ -70,8 +70,25 @@ app.get('/api/version', (req, res) => {
   });
 });
 
+// Database Migration Endpoint
+app.get('/api/migrate', async (req, res) => {
+  try {
+    const result = await migrateDatabase();
+    res.status(200).json({
+      message: 'Migration executed',
+      result,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Migration failed',
+      error: error.message,
+    });
+  }
+});
+
 // Socket.IO initialization
 initializeSocket(io);
+app.set('io', io);
 
 // Error handling middleware
 app.use(errorHandler);

@@ -1,4 +1,4 @@
-import { Message } from '../models/index.js';
+import { Message, Chat } from '../models/index.js';
 import { Op, fn, col } from 'sequelize';
 
 export const sendMessage = async (req, res, next) => {
@@ -22,6 +22,32 @@ export const sendMessage = async (req, res, next) => {
       isDeleted: false,
       isEdited: false,
     });
+
+    const io = req.app.get('io');
+    if (io) {
+      const messageData = {
+        id: message.id,
+        chatId: message.chatId,
+        senderId: message.senderId,
+        content: message.content,
+        fileUrl: message.fileUrl,
+        fileType: message.fileType,
+        fileName: message.fileName,
+        replyTo: message.replyTo,
+        reactions: message.reactions,
+        isDeleted: message.isDeleted,
+        isEdited: message.isEdited,
+        createdAt: message.createdAt,
+        isRead: false,
+      };
+
+      const chat = await Chat.findByPk(chatId);
+      if (chat) {
+        const receiverId = chat.user1Id === senderId ? chat.user2Id : chat.user1Id;
+        io.to(`user:${senderId}`).to(`user:${String(senderId)}`).emit('message:new', messageData);
+        io.to(`user:${receiverId}`).to(`user:${String(receiverId)}`).emit('message:new', messageData);
+      }
+    }
 
     res.status(201).json({
       message: 'Message sent successfully',
