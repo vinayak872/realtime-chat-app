@@ -30,7 +30,11 @@ const Login = () => {
       login(response.data.user, response.data.token);
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid email or password. Please try again.');
+      if (!err.response) {
+        setError('Cannot connect to backend server (localhost:5000). Please ensure the backend is running.');
+      } else {
+        setError(err.response?.data?.message || 'Invalid email or password. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }

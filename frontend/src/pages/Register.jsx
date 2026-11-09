@@ -38,7 +38,11 @@ const Register = () => {
       login(response.data.user, response.data.token);
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed. Please check your details.');
+      if (!err.response) {
+        setError('Cannot connect to backend server (localhost:5000). Please ensure the backend is running.');
+      } else {
+        setError(err.response?.data?.message || 'Registration failed. Please check your details.');
+      }
     } finally {
       setIsLoading(false);
     }
