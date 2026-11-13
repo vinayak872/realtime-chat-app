@@ -14,6 +14,7 @@ const Login = () => {
     email: '',
     password: '',
   });
+  const isRegistrationOpen = import.meta.env.VITE_ALLOW_REGISTRATION === 'true';
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -150,13 +151,19 @@ const Login = () => {
         <div className="mt-8 pt-6 border-t border-white/10 text-center">
           <p className="text-sm text-slate-400">
             Don't have an account?{' '}
-            <Link
-              to="/register"
-              className="text-emerald-400 hover:text-emerald-300 font-medium inline-flex items-center gap-1 hover:underline transition"
-            >
-              <span>Create an account</span>
-              <Sparkles className="w-3.5 h-3.5" />
-            </Link>
+            {isRegistrationOpen ? (
+              <Link
+                to="/register"
+                className="text-emerald-400 hover:text-emerald-300 font-medium inline-flex items-center gap-1 hover:underline transition"
+              >
+                <span>Create an account</span>
+                <Sparkles className="w-3.5 h-3.5" />
+              </Link>
+            ) : (
+              <span className="text-amber-400/90 font-medium text-xs bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full ml-1 inline-flex items-center gap-1">
+                New signups paused
+              </span>
+            )}
           </p>
         </div>
       </div>

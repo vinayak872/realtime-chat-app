@@ -7,6 +7,15 @@ dotenv.config();
 
 export const register = async (req, res, next) => {
   try {
+    // Temporary toggle: disable new user registrations
+    // Set ALLOW_REGISTRATION=true in environment or .env to re-enable
+    const isRegistrationAllowed = process.env.ALLOW_REGISTRATION === 'true';
+    if (!isRegistrationAllowed) {
+      return res.status(403).json({
+        message: 'New user registrations are temporarily closed. Please check back later.',
+      });
+    }
+
     const { username, email, password, confirmPassword } = req.body;
 
     if (!username || !email || !password || !confirmPassword) {
