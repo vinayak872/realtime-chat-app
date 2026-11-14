@@ -132,7 +132,7 @@ const Register = () => {
                   name="username"
                   value={formData.username}
                   onChange={handleChange}
-                  placeholder="vinayak"
+                  placeholder="name"
                   required
                   className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 text-sm sm:text-base focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200"
                 />
