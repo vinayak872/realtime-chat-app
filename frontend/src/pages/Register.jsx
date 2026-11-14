@@ -10,7 +10,7 @@ const Register = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const isRegistrationOpen = import.meta.env.VITE_ALLOW_REGISTRATION === 'true';
+  const isRegistrationOpen = import.meta.env.VITE_DISABLE_REGISTRATION !== 'true';
   const [formData, setFormData] = useState({
     username: '',
     email: '',
