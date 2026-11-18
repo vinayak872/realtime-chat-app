@@ -14,7 +14,7 @@ const Login = () => {
     email: '',
     password: '',
   });
-  const isRegistrationOpen = import.meta.env.VITE_ALLOW_REGISTRATION === 'true';
+  const isRegistrationOpen = import.meta.env.VITE_DISABLE_REGISTRATION !== 'true';
 
   const handleChange = (e) => {
     const { name, value } = e.target;
