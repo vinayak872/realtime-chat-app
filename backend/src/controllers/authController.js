@@ -7,8 +7,8 @@ dotenv.config();
 
 export const register = async (req, res, next) => {
   try {
-    // Check if new registrations are explicitly disabled (default: enabled)
-    const isRegistrationDisabled = process.env.DISABLE_REGISTRATION === 'true';
+    // Check if new registrations are disabled (currently paused)
+    const isRegistrationDisabled = process.env.ALLOW_REGISTRATION !== 'true';
     if (isRegistrationDisabled) {
       return res.status(403).json({
         message: 'New user registrations are temporarily closed. Please check back later.',
